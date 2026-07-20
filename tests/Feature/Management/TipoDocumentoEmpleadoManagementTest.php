@@ -1,0 +1,130 @@
+<?php
+
+namespace Tests\Feature\Management;
+
+use App\Models\EmpleadoDocumento;
+use App\Models\TipoDocumentoEmpleado;
+use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
+use Tests\TestCase;
+
+class TipoDocumentoEmpleadoManagementTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $administrator;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $this->administrator = User::factory()->create();
+        $this->administrator->assignRole('Administrador');
+    }
+
+    public function test_administrator_can_create_update_and_soft_delete_a_document_type(): void
+    {
+        $this->actingAs($this->administrator)
+            ->post(route('tipos-documento-empleados.store'), [
+                'nombre' => 'Identificación oficial',
+                'es_renovable' => true,
+                'frecuencia_cantidad' => 4,
+                'frecuencia_tipo' => 'anios',
+                'documentos_aceptados' => ['pdf', 'jpg'],
+                'activo' => true,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('tipos-documento-empleados.index'));
+
+        $tipoDocumento = TipoDocumentoEmpleado::query()
+            ->where('nombre', 'Identificación oficial')
+            ->firstOrFail();
+
+        $this->assertSame(['PDF', 'JPG'], $tipoDocumento->documentos_aceptados);
+
+        $this->actingAs($this->administrator)
+            ->put(route('tipos-documento-empleados.update', $tipoDocumento), [
+                'nombre' => 'Identificación vigente',
+                'es_renovable' => false,
+                'documentos_aceptados' => ['PDF'],
+                'activo' => false,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('tipos-documento-empleados.index'));
+
+        $tipoDocumento->refresh();
+
+        $this->assertSame('Identificación vigente', $tipoDocumento->nombre);
+        $this->assertFalse($tipoDocumento->es_renovable);
+        $this->assertNull($tipoDocumento->frecuencia_cantidad);
+        $this->assertNull($tipoDocumento->frecuencia_tipo);
+
+        $this->actingAs($this->administrator)
+            ->delete(route('tipos-documento-empleados.destroy', $tipoDocumento))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('tipos-documento-empleados.index'));
+
+        $this->assertSoftDeleted($tipoDocumento);
+    }
+
+    public function test_document_type_validation_requires_frequency_and_valid_extensions(): void
+    {
+        $this->actingAs($this->administrator)
+            ->post(route('tipos-documento-empleados.store'), [
+                'nombre' => 'Documento renovable',
+                'es_renovable' => true,
+                'documentos_aceptados' => ['exe'],
+                'activo' => true,
+            ])
+            ->assertSessionHasErrors([
+                'frecuencia_cantidad',
+                'frecuencia_tipo',
+                'documentos_aceptados.0',
+            ]);
+    }
+
+    public function test_document_type_listing_filters_and_caps_page_size(): void
+    {
+        TipoDocumentoEmpleado::factory()->create([
+            'nombre' => 'Needle Renewable',
+            'es_renovable' => true,
+            'activo' => true,
+        ]);
+        TipoDocumentoEmpleado::factory()->inactive()->create(['nombre' => 'Needle Inactive']);
+        TipoDocumentoEmpleado::factory()->create(['nombre' => 'Other Type']);
+
+        $this->actingAs($this->administrator)
+            ->get(route('tipos-documento-empleados.index', [
+                'search' => 'Needle',
+                'activo' => true,
+                'es_renovable' => true,
+                'per_page' => 500,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('tipos-documento-empleados/index')
+                ->has('tiposDocumento.data', 1)
+                ->where('tiposDocumento.data.0.nombre', 'Needle Renewable')
+                ->where('tiposDocumento.per_page', 100),
+            );
+    }
+
+    public function test_document_type_in_use_cannot_be_deleted(): void
+    {
+        $tipoDocumento = TipoDocumentoEmpleado::factory()->create();
+        EmpleadoDocumento::factory()->create([
+            'tipo_documento_empleado_id' => $tipoDocumento->id,
+        ]);
+
+        $this->actingAs($this->administrator)
+            ->from(route('tipos-documento-empleados.index'))
+            ->delete(route('tipos-documento-empleados.destroy', $tipoDocumento))
+            ->assertSessionHasErrors('tipoDocumentoEmpleado')
+            ->assertRedirect(route('tipos-documento-empleados.index'));
+
+        $this->assertNotSoftDeleted($tipoDocumento);
+    }
+}
