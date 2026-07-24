@@ -4,9 +4,11 @@ import { useState } from 'react';
 import {
     destroy,
     index,
+    restore,
     store,
     update,
 } from '@/actions/App/Http/Controllers/EmpleadoController';
+import { ArchivedRecordsToggle } from '@/components/archived-records-toggle';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { EmpleadoFormFields } from '@/components/empleados/empleado-form-fields';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
@@ -15,6 +17,7 @@ import { ResourcePagination } from '@/components/resource-pagination';
 import { ResourceSearch } from '@/components/resource-search';
 import { ResourceTable } from '@/components/resource-table';
 import type { ResourceColumn } from '@/components/resource-table';
+import { RestoreButton } from '@/components/restore-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,7 +33,7 @@ type Props = {
     empleados: LaravelPaginator<Empleado>;
     puestos: Puesto[];
     tiposDocumento: TipoDocumentoEmpleado[];
-    filters?: { search?: string };
+    filters?: { search?: string; archivados?: boolean };
 };
 
 export default function EmpleadosIndex({
@@ -43,6 +46,7 @@ export default function EmpleadosIndex({
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Empleado | null>(null);
     const [deleting, setDeleting] = useState<Empleado | null>(null);
+    const showingArchived = filters?.archivados ?? false;
 
     const columns: ResourceColumn<Empleado>[] = [
         {
@@ -108,7 +112,13 @@ export default function EmpleadosIndex({
             className: 'md:w-32',
             cell: (empleado) => (
                 <div className="flex justify-end gap-2 md:justify-start">
-                    {can('empleados.update') && (
+                    {showingArchived && can('empleados.update') && (
+                        <RestoreButton
+                            form={restore.form(empleado.id)}
+                            subject={`a ${empleado.nombre}`}
+                        />
+                    )}
+                    {!showingArchived && can('empleados.update') && (
                         <Button
                             size="icon"
                             variant="outline"
@@ -121,7 +131,7 @@ export default function EmpleadosIndex({
                             <Pencil />
                         </Button>
                     )}
-                    {can('empleados.delete') && (
+                    {!showingArchived && can('empleados.delete') && (
                         <Button
                             size="icon"
                             variant="outline"
@@ -145,16 +155,30 @@ export default function EmpleadosIndex({
                     title="Empleados"
                     description="Gestiona datos laborales, documentos y vigencias del personal."
                     actions={
-                        can('empleados.create') ? (
-                            <Button
-                                onClick={() => {
-                                    setEditing(null);
-                                    setDialogOpen(true);
-                                }}
-                            >
-                                <Plus /> Nuevo empleado
-                            </Button>
-                        ) : undefined
+                        <div className="flex flex-wrap gap-2">
+                            <ArchivedRecordsToggle
+                                route={
+                                    showingArchived
+                                        ? index()
+                                        : index({
+                                              query: { archivados: true },
+                                          })
+                                }
+                                showingArchived={showingArchived}
+                                activeLabel="Ver vigentes"
+                                archivedLabel="Ver archivados"
+                            />
+                            {!showingArchived && can('empleados.create') && (
+                                <Button
+                                    onClick={() => {
+                                        setEditing(null);
+                                        setDialogOpen(true);
+                                    }}
+                                >
+                                    <Plus /> Nuevo empleado
+                                </Button>
+                            )}
+                        </div>
                     }
                 />
                 <Card className="py-4">
@@ -163,6 +187,7 @@ export default function EmpleadosIndex({
                             route={index()}
                             defaultValue={filters?.search}
                             placeholder="Buscar por nombre, correo, CURP o RFC"
+                            query={showingArchived ? { archivados: true } : {}}
                         />
                     </CardContent>
                 </Card>
@@ -170,7 +195,11 @@ export default function EmpleadosIndex({
                     data={empleados.data}
                     columns={columns}
                     getRowKey={(empleado) => empleado.id}
-                    emptyTitle="No hay empleados"
+                    emptyTitle={
+                        showingArchived
+                            ? 'No hay empleados archivados'
+                            : 'No hay empleados'
+                    }
                 />
                 <ResourcePagination paginator={empleados} />
             </main>

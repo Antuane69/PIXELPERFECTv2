@@ -4,9 +4,11 @@ import { useState } from 'react';
 import {
     destroy,
     index,
+    restore,
     store,
     update,
 } from '@/actions/App/Http/Controllers/TipoDocumentoEmpleadoController';
+import { ArchivedRecordsToggle } from '@/components/archived-records-toggle';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import InputError from '@/components/input-error';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
@@ -15,6 +17,7 @@ import { ResourcePagination } from '@/components/resource-pagination';
 import { ResourceSearch } from '@/components/resource-search';
 import { ResourceTable } from '@/components/resource-table';
 import type { ResourceColumn } from '@/components/resource-table';
+import { RestoreButton } from '@/components/restore-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,7 +36,7 @@ import type { LaravelPaginator, TipoDocumentoEmpleado } from '@/types';
 
 type Props = {
     tiposDocumento: LaravelPaginator<TipoDocumentoEmpleado>;
-    filters?: { search?: string };
+    filters?: { search?: string; archivados?: boolean };
 };
 
 const formats = [
@@ -64,6 +67,7 @@ export default function TiposDocumentoIndex({
     const [deleting, setDeleting] = useState<TipoDocumentoEmpleado | null>(
         null,
     );
+    const showingArchived = filters?.archivados ?? false;
 
     const columns: ResourceColumn<TipoDocumentoEmpleado>[] = [
         {
@@ -96,8 +100,20 @@ export default function TiposDocumentoIndex({
             key: 'activo',
             header: 'Estado',
             cell: (tipo) => (
-                <Badge variant={tipo.activo ? 'default' : 'secondary'}>
-                    {tipo.activo ? 'Activo' : 'Inactivo'}
+                <Badge
+                    variant={
+                        showingArchived
+                            ? 'outline'
+                            : tipo.activo
+                              ? 'default'
+                              : 'secondary'
+                    }
+                >
+                    {showingArchived
+                        ? 'Archivado'
+                        : tipo.activo
+                          ? 'Activo'
+                          : 'Inactivo'}
                 </Badge>
             ),
         },
@@ -107,7 +123,13 @@ export default function TiposDocumentoIndex({
             className: 'md:w-32',
             cell: (tipo) => (
                 <div className="flex justify-end gap-2 md:justify-start">
-                    {can('tipos_documento.update') && (
+                    {showingArchived && can('tipos_documento.update') && (
+                        <RestoreButton
+                            form={restore.form(tipo.id)}
+                            subject={`el tipo ${tipo.nombre}`}
+                        />
+                    )}
+                    {!showingArchived && can('tipos_documento.update') && (
                         <Button
                             size="icon"
                             variant="outline"
@@ -120,7 +142,7 @@ export default function TiposDocumentoIndex({
                             <Pencil />
                         </Button>
                     )}
-                    {can('tipos_documento.delete') && (
+                    {!showingArchived && can('tipos_documento.delete') && (
                         <Button
                             size="icon"
                             variant="outline"
@@ -144,16 +166,31 @@ export default function TiposDocumentoIndex({
                     title="Tipos de documento"
                     description="Configura los documentos requeridos para los expedientes."
                     actions={
-                        can('tipos_documento.create') ? (
-                            <Button
-                                onClick={() => {
-                                    setEditing(null);
-                                    setDialogOpen(true);
-                                }}
-                            >
-                                <Plus /> Nuevo tipo
-                            </Button>
-                        ) : undefined
+                        <div className="flex flex-wrap gap-2">
+                            <ArchivedRecordsToggle
+                                route={
+                                    showingArchived
+                                        ? index()
+                                        : index({
+                                              query: { archivados: true },
+                                          })
+                                }
+                                showingArchived={showingArchived}
+                                activeLabel="Ver vigentes"
+                                archivedLabel="Ver archivados"
+                            />
+                            {!showingArchived &&
+                                can('tipos_documento.create') && (
+                                    <Button
+                                        onClick={() => {
+                                            setEditing(null);
+                                            setDialogOpen(true);
+                                        }}
+                                    >
+                                        <Plus /> Nuevo tipo
+                                    </Button>
+                                )}
+                        </div>
                     }
                 />
                 <Card className="py-4">
@@ -162,6 +199,7 @@ export default function TiposDocumentoIndex({
                             route={index()}
                             defaultValue={filters?.search}
                             placeholder="Buscar tipo de documento"
+                            query={showingArchived ? { archivados: true } : {}}
                         />
                     </CardContent>
                 </Card>
@@ -169,7 +207,11 @@ export default function TiposDocumentoIndex({
                     data={tiposDocumento.data}
                     columns={columns}
                     getRowKey={(tipo) => tipo.id}
-                    emptyTitle="No hay tipos de documento"
+                    emptyTitle={
+                        showingArchived
+                            ? 'No hay tipos de documento archivados'
+                            : 'No hay tipos de documento'
+                    }
                 />
                 <ResourcePagination paginator={tiposDocumento} />
             </main>

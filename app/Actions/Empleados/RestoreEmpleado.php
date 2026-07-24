@@ -18,20 +18,16 @@ class RestoreEmpleado
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($empleadoArchivado->puesto_id !== null) {
-                $puesto = Puesto::query()
-                    ->withTrashed()
-                    ->whereKey($empleadoArchivado->puesto_id)
-                    ->lockForUpdate()
-                    ->first();
+            $puesto = Puesto::query()
+                ->withTrashed()
+                ->whereKey($empleadoArchivado->puesto_id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-                if ($puesto === null || $puesto->trashed()) {
-                    $puestoNombre = $puesto?->nombre ?? 'asignado';
-
-                    throw ValidationException::withMessages([
-                        'empleado' => "Primero restaura el puesto {$puestoNombre} para recuperar este empleado.",
-                    ]);
-                }
+            if ($puesto->trashed()) {
+                throw ValidationException::withMessages([
+                    'empleado' => "Primero restaura el puesto {$puesto->nombre} para recuperar este empleado.",
+                ]);
             }
 
             $empleadoArchivado->restore();

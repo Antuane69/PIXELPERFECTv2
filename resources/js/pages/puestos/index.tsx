@@ -1,5 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
-import { Archive, List, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     destroy,
@@ -8,6 +8,7 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/PuestoController';
+import { ArchivedRecordsToggle } from '@/components/archived-records-toggle';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import InputError from '@/components/input-error';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
@@ -132,16 +133,30 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                     title="Puestos"
                     description="Mantén actualizado el catálogo salarial y de puestos."
                     actions={
-                        can('puestos.create') ? (
-                            <Button
-                                onClick={() => {
-                                    setEditing(null);
-                                    setDialogOpen(true);
-                                }}
-                            >
-                                <Plus /> Nuevo puesto
-                            </Button>
-                        ) : undefined
+                        <div className="flex flex-wrap gap-2">
+                            <ArchivedRecordsToggle
+                                route={
+                                    showingArchived
+                                        ? index()
+                                        : index({
+                                              query: { archivados: true },
+                                          })
+                                }
+                                showingArchived={showingArchived}
+                                activeLabel="Ver vigentes"
+                                archivedLabel="Ver archivados"
+                            />
+                            {!showingArchived && can('puestos.create') && (
+                                <Button
+                                    onClick={() => {
+                                        setEditing(null);
+                                        setDialogOpen(true);
+                                    }}
+                                >
+                                    <Plus /> Nuevo puesto
+                                </Button>
+                            )}
+                        </div>
                     }
                 />
                 <Card className="py-4">
@@ -150,6 +165,7 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                             route={index()}
                             defaultValue={filters?.search}
                             placeholder="Buscar puesto"
+                            query={showingArchived ? { archivados: true } : {}}
                         />
                     </CardContent>
                 </Card>
@@ -157,7 +173,11 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                     data={puestos.data}
                     columns={columns}
                     getRowKey={(puesto) => puesto.id}
-                    emptyTitle="No hay puestos"
+                    emptyTitle={
+                        showingArchived
+                            ? 'No hay puestos archivados'
+                            : 'No hay puestos'
+                    }
                 />
                 <ResourcePagination paginator={puestos} />
             </main>

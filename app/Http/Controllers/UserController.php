@@ -157,5 +157,4 @@ class UserController extends Controller
     {
         return min(max($request->integer('per_page', 15), 1), 100);
     }
-
 }

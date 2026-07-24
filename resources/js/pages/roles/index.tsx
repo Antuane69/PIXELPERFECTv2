@@ -174,7 +174,7 @@ export default function RolesIndex({ roles, permissions, filters }: Props) {
                 <ConfirmDeleteDialog
                     open
                     onOpenChange={(open) => !open && setDeleting(null)}
-                    form={destroy.form(String(deleting.id))}
+                    form={destroy.form(deleting.id)}
                     subject={`el rol “${deleting.name}”`}
                 />
             )}
@@ -207,7 +207,7 @@ function RoleDialog({
             title={role ? 'Editar rol' : 'Nuevo rol'}
             description="Selecciona únicamente los permisos necesarios."
             formId={formId}
-            form={role ? update.form(String(role.id)) : store.form()}
+            form={role ? update.form(role.id) : store.form()}
             resetOnSuccess={!role}
             className="sm:max-w-3xl"
         >

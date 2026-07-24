@@ -111,4 +111,28 @@ class PuestoManagementTest extends TestCase
 
         $this->assertNotSoftDeleted($puesto);
     }
+
+    public function test_administrator_can_list_and_restore_archived_positions(): void
+    {
+        Puesto::factory()->create(['nombre' => 'Puesto vigente']);
+        $archivedPuesto = Puesto::factory()->create(['nombre' => 'Puesto archivado']);
+        $archivedPuesto->delete();
+
+        $this->actingAs($this->administrator)
+            ->get(route('puestos.index', ['archivados' => true]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('puestos/index')
+                ->has('puestos.data', 1)
+                ->where('puestos.data.0.id', $archivedPuesto->id)
+                ->where('filters.archivados', true),
+            );
+
+        $this->actingAs($this->administrator)
+            ->patch(route('puestos.restore', $archivedPuesto))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('puestos.index', ['archivados' => true]));
+
+        $this->assertNotSoftDeleted($archivedPuesto);
+    }
 }

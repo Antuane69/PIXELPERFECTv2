@@ -34,7 +34,6 @@ class LegacyDataImporter
     private const REQUIRED_TABLES = [
         'users',
         'puestos',
-        'tipo_documentos_empleados',
         'empleados',
     ];
 
@@ -73,6 +72,8 @@ class LegacyDataImporter
                 throw new RuntimeException("The legacy database is missing the [{$table}] table.");
             }
         }
+
+        $this->documentTypesTable();
     }
 
     /**
@@ -124,15 +125,20 @@ class LegacyDataImporter
      */
     private function importDocumentTypes(bool $overwrite): array
     {
-        return $this->importInChunks('tipo_documentos_empleados', function (array $legacyType) use ($overwrite): string {
+        $table = $this->documentTypesTable();
+        $usesNormalizedSchema = Schema::connection('legacy')->hasColumn($table, 'es_renovable');
+
+        return $this->importInChunks($table, function (array $legacyType) use ($overwrite, $usesNormalizedSchema): string {
             $documents = collect($this->decodeJsonArray($legacyType['documentos_aceptados'] ?? null))
                 ->map(static fn (string $extension): string => Str::upper(trim($extension)))
                 ->intersect(self::DOCUMENT_EXTENSIONS)
                 ->unique()
                 ->values()
                 ->all();
-            $frequency = filled($legacyType['frecuencia_tipo'] ?? null)
-                || filled($legacyType['frecuencia_dias'] ?? null);
+            $frequency = $usesNormalizedSchema
+                ? (bool) ($legacyType['es_renovable'] ?? false)
+                : filled($legacyType['frecuencia_tipo'] ?? null)
+                    || filled($legacyType['frecuencia_dias'] ?? null);
 
             return $this->persist(
                 'tipo_documento_empleados',
@@ -140,7 +146,11 @@ class LegacyDataImporter
                 [
                     'es_renovable' => $frequency,
                     'frecuencia_cantidad' => $frequency
-                        ? ($legacyType['frecuencia_dias'] ?? null)
+                        ? ($legacyType[
+                            $usesNormalizedSchema
+                                ? 'frecuencia_cantidad'
+                                : 'frecuencia_dias'
+                        ] ?? null)
                         : null,
                     'frecuencia_tipo' => $frequency
                         ? Str::lower((string) ($legacyType['frecuencia_tipo'] ?? ''))
@@ -162,13 +172,23 @@ class LegacyDataImporter
     private function importEmployees(bool $overwrite): array
     {
         $hasUsername = Schema::connection('legacy')->hasColumn('empleados', 'nombre_usuario');
+        $hasPositionId = Schema::connection('legacy')->hasColumn('empleados', 'puesto_id');
 
-        return $this->importInChunks('empleados', function (array $legacyEmployee) use ($hasUsername, $overwrite): string {
+        return $this->importInChunks('empleados', function (array $legacyEmployee) use ($hasPositionId, $hasUsername, $overwrite): string {
             $legacyId = (int) $legacyEmployee['id'];
             $legacyCurp = Str::upper((string) $legacyEmployee['curp']);
             $legacyEmail = $legacyEmployee['correo'] ?? null;
             $legacyUsername = $legacyEmployee['nombre_usuario'] ?? null;
-            $positionName = Str::squish((string) (($legacyEmployee['puesto'] ?? null) ?: 'Sin puesto'));
+            $legacyPositionName = $hasPositionId
+                ? $this->legacyTable('puestos')
+                    ->where('id', $legacyEmployee['puesto_id'] ?? 0)
+                    ->value('nombre')
+                : $legacyEmployee['puesto'] ?? null;
+            $positionName = Str::squish(
+                is_string($legacyPositionName) && $legacyPositionName !== ''
+                    ? $legacyPositionName
+                    : 'Sin puesto',
+            );
             $positionId = DB::table('puestos')->where('nombre', $positionName)->value('id');
 
             if ($positionId === null) {
@@ -310,10 +330,29 @@ class LegacyDataImporter
         return DB::connection('legacy');
     }
 
+    private function documentTypesTable(): string
+    {
+        foreach (['tipo_documentos_empleados', 'tipo_documento_empleados'] as $table) {
+            if (Schema::connection('legacy')->hasTable($table)) {
+                return $table;
+            }
+        }
+
+        throw new RuntimeException(
+            'The legacy database is missing an employee document types table.',
+        );
+    }
+
     private function uniqueUsername(?string $legacyUsername, ?string $email, int $legacyId): string
     {
-        $base = Str::slug((string) ($legacyUsername ?: Str::before((string) $email, '@')), '_');
-        $base = $base !== '' ? Str::limit($base, 50, '') : "empleado_{$legacyId}";
+        $base = Str::of((string) ($legacyUsername ?: Str::before((string) $email, '@')))
+            ->ascii()
+            ->lower()
+            ->replaceMatches('/[^a-z0-9._-]+/', '_')
+            ->trim('._-')
+            ->limit(50, '')
+            ->toString();
+        $base = $base !== '' ? $base : "empleado_{$legacyId}";
         $candidate = $base;
         $suffix = 1;
 

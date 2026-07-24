@@ -306,6 +306,43 @@ class EmpleadoManagementTest extends TestCase
             ->assertSessionHasErrors('documentos.0.tipo_documento_empleado_id');
     }
 
+    public function test_employee_restore_requires_an_active_position_and_preserves_the_record(): void
+    {
+        $puesto = Puesto::factory()->create(['nombre' => 'Puesto histórico']);
+        $empleado = Empleado::factory()->create(['puesto_id' => $puesto->id]);
+        $empleado->delete();
+        $puesto->delete();
+
+        $this->actingAs($this->administrator)
+            ->get(route('empleados.index', ['archivados' => true]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('empleados/index')
+                ->has('empleados.data', 1)
+                ->where('empleados.data.0.id', $empleado->id)
+                ->where('empleados.data.0.puesto.nombre', 'Puesto histórico')
+                ->where('filters.archivados', true),
+            );
+
+        $this->actingAs($this->administrator)
+            ->from(route('empleados.index', ['archivados' => true]))
+            ->patch(route('empleados.restore', $empleado))
+            ->assertSessionHasErrors('empleado');
+
+        $this->assertSoftDeleted($empleado);
+
+        $this->actingAs($this->administrator)
+            ->patch(route('puestos.restore', $puesto))
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->administrator)
+            ->patch(route('empleados.restore', $empleado))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('empleados.index', ['archivados' => true]));
+
+        $this->assertNotSoftDeleted($empleado);
+    }
+
     /**
      * @return array<string, mixed>
      */

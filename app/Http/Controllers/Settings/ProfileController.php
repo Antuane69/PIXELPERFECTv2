@@ -58,10 +58,10 @@ class ProfileController extends Controller
 
         DB::transaction(function () use ($user): void {
             $this->ensureAdministratorRemains->handle($user);
+            Auth::logout();
             $user->delete();
         });
 
-        Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

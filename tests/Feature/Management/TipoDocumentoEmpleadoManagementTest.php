@@ -127,4 +127,28 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
 
         $this->assertNotSoftDeleted($tipoDocumento);
     }
+
+    public function test_administrator_can_list_and_restore_archived_document_types(): void
+    {
+        TipoDocumentoEmpleado::factory()->create(['nombre' => 'Tipo vigente']);
+        $archivedType = TipoDocumentoEmpleado::factory()->create(['nombre' => 'Tipo archivado']);
+        $archivedType->delete();
+
+        $this->actingAs($this->administrator)
+            ->get(route('tipos-documento-empleados.index', ['archivados' => true]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('tipos-documento-empleados/index')
+                ->has('tiposDocumento.data', 1)
+                ->where('tiposDocumento.data.0.id', $archivedType->id)
+                ->where('filters.archivados', true),
+            );
+
+        $this->actingAs($this->administrator)
+            ->patch(route('tipos-documento-empleados.restore', $archivedType))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('tipos-documento-empleados.index', ['archivados' => true]));
+
+        $this->assertNotSoftDeleted($archivedType);
+    }
 }

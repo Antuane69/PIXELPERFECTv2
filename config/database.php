@@ -65,7 +65,7 @@ return [
         ],
 
         'legacy' => [
-            'driver' => 'mysql',
+            'driver' => env('LEGACY_DB_CONNECTION', 'mysql'),
             'url' => env('LEGACY_DB_URL'),
             'host' => env('LEGACY_DB_HOST', '127.0.0.1'),
             'port' => env('LEGACY_DB_PORT', '3306'),
@@ -77,6 +77,7 @@ return [
             'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '',
             'prefix_indexes' => true,
+            'foreign_key_constraints' => env('LEGACY_DB_FOREIGN_KEYS', true),
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([

@@ -57,7 +57,7 @@ class Empleado extends Model
      */
     public function puesto(): BelongsTo
     {
-        return $this->belongsTo(Puesto::class);
+        return $this->belongsTo(Puesto::class)->withTrashed();
     }
 
     /**

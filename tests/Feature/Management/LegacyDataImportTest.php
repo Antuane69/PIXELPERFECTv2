@@ -184,6 +184,88 @@ class LegacyDataImportTest extends TestCase
         $this->assertSame(0, TipoDocumentoEmpleado::query()->count());
     }
 
+    public function test_it_can_restore_data_from_the_normalized_sqlite_snapshot(): void
+    {
+        Schema::connection('legacy')->drop('tipo_documentos_empleados');
+        Schema::connection('legacy')->create('tipo_documento_empleados', function (Blueprint $table): void {
+            $table->id();
+            $table->string('nombre');
+            $table->boolean('es_renovable');
+            $table->unsignedInteger('frecuencia_cantidad')->nullable();
+            $table->string('frecuencia_tipo')->nullable();
+            $table->json('documentos_aceptados');
+            $table->boolean('activo');
+            $table->timestamps();
+            $table->softDeletes();
+        });
+        Schema::connection('legacy')->table('empleados', function (Blueprint $table): void {
+            $table->string('nombre_usuario')->nullable();
+            $table->unsignedBigInteger('puesto_id')->nullable();
+        });
+
+        $now = now()->subMonth();
+        DB::connection('legacy')->table('users')->insert([
+            'name' => 'Administrador del respaldo',
+            'email' => 'admin@admin.com',
+            'email_verified_at' => $now,
+            'password' => Hash::make('snapshot-password'),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $positionId = DB::connection('legacy')->table('puestos')->insertGetId([
+            'nombre' => 'Desarrollo',
+            'salario_dia' => 800,
+            'salario_quincena' => 12000,
+            'activo' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        DB::connection('legacy')->table('tipo_documento_empleados')->insert([
+            'nombre' => 'Contrato anual',
+            'es_renovable' => true,
+            'frecuencia_cantidad' => 1,
+            'frecuencia_tipo' => 'anios',
+            'documentos_aceptados' => json_encode(['PDF'], JSON_THROW_ON_ERROR),
+            'activo' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        DB::connection('legacy')->table('empleados')->insert([
+            'nombre' => 'Persona del respaldo',
+            'nombre_usuario' => 'persona.respaldo',
+            'correo' => 'persona.respaldo@example.com',
+            'curp' => 'GOCG650418HVZNML09',
+            'rfc' => 'GOCG650418AB1',
+            'puesto_id' => $positionId,
+            'estado_civil' => 'soltero',
+            'sexo' => 'otro',
+            'domicilio' => 'Domicilio del respaldo número 123',
+            'telefono' => '3221234567',
+            'dias_descanso' => json_encode(['domingo'], JSON_THROW_ON_ERROR),
+            'fecha_ingreso' => '2025-01-15',
+            'fecha_nacimiento' => '1990-05-20',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $this->legacyImportCommand()->assertSuccessful();
+
+        $position = Puesto::query()->where('nombre', 'Desarrollo')->firstOrFail();
+        $documentType = TipoDocumentoEmpleado::query()
+            ->where('nombre', 'Contrato anual')
+            ->firstOrFail();
+        $employee = Empleado::query()->where('curp', 'GOCG650418HVZNML09')->firstOrFail();
+
+        $this->assertTrue($employee->puesto->is($position));
+        $this->assertSame('persona.respaldo', $employee->nombre_usuario);
+        $this->assertTrue($documentType->es_renovable);
+        $this->assertSame(1, $documentType->frecuencia_cantidad);
+        $this->assertSame(['PDF'], $documentType->documentos_aceptados);
+        $this->assertTrue(
+            User::query()->where('email', 'admin@admin.com')->firstOrFail()->hasRole('Administrador'),
+        );
+    }
+
     private function createLegacySchema(): void
     {
         Schema::connection('legacy')->create('users', function (Blueprint $table): void {
