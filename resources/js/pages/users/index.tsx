@@ -63,6 +63,30 @@ export default function UsersIndex({ users, roles, filters }: Props) {
         },
         { key: 'email', header: 'Correo', cell: (user) => user.email },
         {
+            key: 'security',
+            header: 'Seguridad',
+            cell: (user) => (
+                <div className="flex flex-wrap justify-end gap-1 md:justify-start">
+                    <Badge
+                        variant={
+                            user.email_verified_at ? 'secondary' : 'outline'
+                        }
+                    >
+                        {user.email_verified_at
+                            ? 'Correo verificado'
+                            : 'Correo pendiente'}
+                    </Badge>
+                    <Badge
+                        variant={
+                            user.two_factor_enabled ? 'secondary' : 'outline'
+                        }
+                    >
+                        {user.two_factor_enabled ? '2FA activo' : 'Sin 2FA'}
+                    </Badge>
+                </div>
+            ),
+        },
+        {
             key: 'roles',
             header: 'Roles',
             cell: (user) => (

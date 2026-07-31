@@ -1,4 +1,10 @@
+import { DatePicker } from 'antd';
+import type { DatePickerProps } from 'antd';
+import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import { Download, FileUp, ImagePlus } from 'lucide-react';
+import { Info } from 'lucide-react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +19,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type {
     Empleado,
     EmpleadoDocumento,
@@ -45,6 +56,53 @@ function FormField({ id, label, error, hint, children }: FormFieldProps) {
             ) : null}
             <InputError message={error} />
         </div>
+    );
+}
+
+type DateFieldProps = {
+    id: string;
+    name: string;
+    label: string;
+    value: string;
+    error?: string;
+    required?: boolean;
+    disabledDate?: DatePickerProps['disabledDate'];
+    onChange: (value: string) => void;
+};
+
+function DateField({
+    id,
+    name,
+    label,
+    value,
+    error,
+    required = false,
+    disabledDate,
+    onChange,
+}: DateFieldProps) {
+    const dateValue = value ? dayjs(value) : null;
+
+    return (
+        <FormField id={id} label={label} error={error}>
+            <DatePicker
+                id={id}
+                value={dateValue?.isValid() ? dateValue : null}
+                format="DD/MM/YYYY"
+                placeholder="dd/mm/aaaa"
+                disabledDate={disabledDate}
+                status={error ? 'error' : undefined}
+                className="!h-9 !w-full"
+                onChange={(date: Dayjs | null) =>
+                    onChange(date ? date.format('YYYY-MM-DD') : '')
+                }
+            />
+            <input
+                type="hidden"
+                name={name}
+                value={value}
+                required={required}
+            />
+        </FormField>
     );
 }
 
@@ -105,17 +163,6 @@ const weekDays = [
     ['domingo', 'Domingo'],
 ] as const;
 
-const dateFields = [
-    ['fecha_nacimiento', 'Fecha de nacimiento'],
-    ['fecha_ingreso', 'Fecha de ingreso'],
-    ['fecha_contrato_siguiente', 'Siguiente contrato'],
-    ['fecha_contrato_indefinido', 'Contrato indefinido'],
-    ['fecha_ultimo_aviso', 'Último aviso'],
-    ['fecha_evaluacion', 'Evaluación'],
-    ['fecha_inicio_contrato', 'Inicio de contrato'],
-    ['fecha_termino_contrato', 'Término de contrato'],
-] as const;
-
 const documentError = (
     errors: Record<string, string>,
     tipoId: number,
@@ -141,9 +188,74 @@ export function EmpleadoFormFields({
     tiposDocumento,
     errors,
 }: Props) {
+    const today = dayjs().format('YYYY-MM-DD');
+    const [selectedPuestoId, setSelectedPuestoId] = useState(
+        empleado?.puesto_id ? String(empleado.puesto_id) : '',
+    );
+    const [salaryValues, setSalaryValues] = useState({
+        salario_dia: String(empleado?.salario_dia ?? ''),
+        salario_quincena: String(empleado?.salario_quincena ?? ''),
+    });
+    const [dateValues, setDateValues] = useState({
+        fecha_nacimiento: empleado?.fecha_nacimiento ?? '',
+        fecha_ingreso: empleado?.fecha_ingreso ?? today,
+    });
+    const [periodoPruebaMeses, setPeriodoPruebaMeses] = useState(
+        String(empleado?.periodo_prueba_meses ?? 3),
+    );
+    const [documentExpiryValues, setDocumentExpiryValues] = useState<
+        Record<number, string>
+    >(() =>
+        tiposDocumento.reduce<Record<number, string>>((values, tipo) => {
+            values[tipo.id] =
+                existingDocument(empleado, tipo.id)?.vence_el ?? '';
+
+            return values;
+        }, {}),
+    );
     const visibleDocumentTypes = tiposDocumento.filter(
         (tipo) => tipo.activo !== false || existingDocument(empleado, tipo.id),
     );
+    const periodo = Number(periodoPruebaMeses);
+    const trialSchedule =
+        dateValues.fecha_ingreso && periodo >= 1 && periodo <= 6
+            ? Array.from({ length: periodo }, (_, index) => {
+                  const date = dayjs(dateValues.fecha_ingreso).add(
+                      index + 1,
+                      'month',
+                  );
+
+                  return {
+                      date: date.format('DD/MM/YYYY'),
+                      label:
+                          index + 1 === periodo
+                              ? 'Contrato definitivo'
+                              : `Contrato de prueba ${index + 1}`,
+                  };
+              })
+            : [];
+
+    const updateDate = (field: keyof typeof dateValues, value: string) => {
+        setDateValues((current) => ({ ...current, [field]: value }));
+    };
+
+    const updatePuesto = (puestoId: string) => {
+        setSelectedPuestoId(puestoId);
+
+        const puesto = puestos.find((item) => String(item.id) === puestoId);
+
+        setSalaryValues({
+            salario_dia: String(puesto?.salario_dia ?? ''),
+            salario_quincena: String(puesto?.salario_quincena ?? ''),
+        });
+    };
+
+    const updateDocumentExpiry = (tipoId: number, value: string) => {
+        setDocumentExpiryValues((current) => ({
+            ...current,
+            [tipoId]: value,
+        }));
+    };
 
     return (
         <div className="grid gap-5 pb-1">
@@ -259,11 +371,8 @@ export function EmpleadoFormFields({
                     >
                         <Select
                             name="puesto_id"
-                            defaultValue={
-                                empleado?.puesto_id
-                                    ? String(empleado.puesto_id)
-                                    : undefined
-                            }
+                            value={selectedPuestoId || undefined}
+                            onValueChange={updatePuesto}
                             required
                         >
                             <SelectTrigger
@@ -395,14 +504,36 @@ export function EmpleadoFormFields({
                             label={label}
                             error={errors[field]}
                         >
-                            <Input
-                                id={`empleado-${field}`}
-                                type="number"
-                                name={field}
-                                min="0"
-                                step="0.01"
-                                defaultValue={empleado?.[field] ?? ''}
-                            />
+                            {field === 'salario_dia' ||
+                            field === 'salario_quincena' ? (
+                                <Input
+                                    id={`empleado-${field}`}
+                                    type="number"
+                                    name={field}
+                                    min="0"
+                                    step="0.01"
+                                    value={
+                                        field === 'salario_dia'
+                                            ? salaryValues.salario_dia
+                                            : salaryValues.salario_quincena
+                                    }
+                                    onChange={(event) =>
+                                        setSalaryValues((current) => ({
+                                            ...current,
+                                            [field]: event.target.value,
+                                        }))
+                                    }
+                                />
+                            ) : (
+                                <Input
+                                    id={`empleado-${field}`}
+                                    type="number"
+                                    name={field}
+                                    min="0"
+                                    step="0.01"
+                                    defaultValue={empleado?.[field] ?? ''}
+                                />
+                            )}
                         </FormField>
                     ))}
                     {dayFields.map(([field, label]) => (
@@ -416,9 +547,13 @@ export function EmpleadoFormFields({
                                 id={`empleado-${field}`}
                                 type="number"
                                 name={field}
-                                min="0"
+                                min={field === 'dias_vacaciones' ? '2' : '0'}
                                 step="1"
-                                defaultValue={empleado?.[field] ?? ''}
+                                defaultValue={
+                                    field === 'dias_vacaciones'
+                                        ? (empleado?.dias_vacaciones ?? 2)
+                                        : (empleado?.dias_liquidacion ?? '')
+                                }
                             />
                         </FormField>
                     ))}
@@ -455,28 +590,97 @@ export function EmpleadoFormFields({
 
             <FormSection
                 title="Fechas laborales"
-                description="Cronología contractual y de seguimiento."
+                description="La fecha de ingreso activa el calendario contractual."
             >
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {dateFields.map(([field, label]) => (
-                        <FormField
-                            key={field}
-                            id={`empleado-${field}`}
-                            label={label}
-                            error={errors[field]}
+                    <DateField
+                        id="empleado-fecha-nacimiento"
+                        name="fecha_nacimiento"
+                        label="Fecha de nacimiento"
+                        value={dateValues.fecha_nacimiento}
+                        error={errors.fecha_nacimiento}
+                        required={!empleado}
+                        disabledDate={(date) =>
+                            date.isAfter(dayjs().subtract(16, 'year'), 'day')
+                        }
+                        onChange={(value) =>
+                            updateDate('fecha_nacimiento', value)
+                        }
+                    />
+                    <DateField
+                        id="empleado-fecha-ingreso"
+                        name="fecha_ingreso"
+                        label="Fecha de ingreso"
+                        value={dateValues.fecha_ingreso}
+                        error={errors.fecha_ingreso}
+                        required={!empleado}
+                        disabledDate={(date) => date.isAfter(dayjs(), 'day')}
+                        onChange={(value) => updateDate('fecha_ingreso', value)}
+                    />
+                    <div className="grid gap-2">
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor="empleado-periodo-prueba">
+                                Periodo de prueba
+                            </Label>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="rounded-full text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        aria-label="Información sobre periodo de prueba"
+                                    >
+                                        <Info className="size-4" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    Se genera un contrato mensual de prueba y el
+                                    último registro marca el contrato
+                                    definitivo.
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
+                        <Select
+                            name="periodo_prueba_meses"
+                            value={periodoPruebaMeses}
+                            onValueChange={setPeriodoPruebaMeses}
+                            required
                         >
-                            <Input
-                                id={`empleado-${field}`}
-                                type="date"
-                                name={field}
-                                defaultValue={empleado?.[field] ?? ''}
-                                required={
-                                    field === 'fecha_nacimiento' ||
-                                    field === 'fecha_ingreso'
-                                }
-                            />
-                        </FormField>
-                    ))}
+                            <SelectTrigger
+                                id="empleado-periodo-prueba"
+                                className="w-full"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Array.from({ length: 6 }, (_, index) => {
+                                    const months = index + 1;
+
+                                    return (
+                                        <SelectItem
+                                            key={months}
+                                            value={String(months)}
+                                        >
+                                            {months}{' '}
+                                            {months === 1 ? 'mes' : 'meses'}
+                                        </SelectItem>
+                                    );
+                                })}
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errors.periodo_prueba_meses} />
+                        {trialSchedule.length > 0 ? (
+                            <div className="grid gap-1 rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+                                {trialSchedule.map((item) => (
+                                    <p key={`${item.label}-${item.date}`}>
+                                        <span className="font-medium text-foreground">
+                                            {item.label}:
+                                        </span>{' '}
+                                        {item.date}
+                                    </p>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
                 </div>
             </FormSection>
 
@@ -566,25 +770,28 @@ export function EmpleadoFormFields({
                                         </div>
                                     </FormField>
                                     {tipo.es_renovable && (
-                                        <FormField
+                                        <DateField
                                             id={`documento-vence-${tipo.id}`}
+                                            name={`documentos[${tipo.id}][vence_el]`}
                                             label="Fecha de vencimiento"
+                                            value={
+                                                documentExpiryValues[tipo.id] ??
+                                                current?.vence_el ??
+                                                ''
+                                            }
                                             error={documentError(
                                                 errors,
                                                 tipo.id,
                                                 'vence_el',
                                             )}
-                                        >
-                                            <Input
-                                                id={`documento-vence-${tipo.id}`}
-                                                type="date"
-                                                name={`documentos[${tipo.id}][vence_el]`}
-                                                defaultValue={
-                                                    current?.vence_el ?? ''
-                                                }
-                                                required={!empleado}
-                                            />
-                                        </FormField>
+                                            required
+                                            onChange={(value) =>
+                                                updateDocumentExpiry(
+                                                    tipo.id,
+                                                    value,
+                                                )
+                                            }
+                                        />
                                     )}
                                 </article>
                             );

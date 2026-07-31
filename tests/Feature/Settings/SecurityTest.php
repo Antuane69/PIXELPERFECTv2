@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
+use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
 class SecurityTest extends TestCase
@@ -107,5 +108,61 @@ class SecurityTest extends TestCase
         $response
             ->assertSessionHasErrors('current_password')
             ->assertRedirect(route('security.edit'));
+    }
+
+    public function test_two_factor_authentication_can_be_enabled_confirmed_and_disabled(): void
+    {
+        $user = User::factory()->create();
+        $confirmedPasswordSession = ['auth.password_confirmed_at' => time()];
+
+        $this->actingAs($user)
+            ->withSession($confirmedPasswordSession)
+            ->post(route('two-factor.enable'))
+            ->assertSessionHasNoErrors();
+
+        $user->refresh();
+
+        $this->assertNotNull($user->two_factor_secret);
+        $this->assertNotNull($user->two_factor_recovery_codes);
+        $this->assertNull($user->two_factor_confirmed_at);
+
+        $this->actingAs($user)
+            ->withSession($confirmedPasswordSession)
+            ->getJson(route('two-factor.qr-code'))
+            ->assertOk()
+            ->assertJsonStructure(['svg', 'url']);
+
+        $secret = decrypt($user->two_factor_secret);
+        $code = app(Google2FA::class)->getCurrentOtp($secret);
+
+        $this->actingAs($user)
+            ->withSession($confirmedPasswordSession)
+            ->post(route('two-factor.confirm'), ['code' => $code])
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue($user->refresh()->hasEnabledTwoFactorAuthentication());
+
+        $this->actingAs($user)
+            ->withSession($confirmedPasswordSession)
+            ->delete(route('two-factor.disable'))
+            ->assertSessionHasNoErrors();
+
+        $user->refresh();
+
+        $this->assertFalse($user->hasEnabledTwoFactorAuthentication());
+        $this->assertNull($user->two_factor_secret);
+        $this->assertNull($user->two_factor_recovery_codes);
+        $this->assertNull($user->two_factor_confirmed_at);
+    }
+
+    public function test_two_factor_management_requires_recent_password_confirmation(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('two-factor.enable'))
+            ->assertRedirect(route('password.confirm'));
+
+        $this->assertFalse($user->refresh()->hasEnabledTwoFactorAuthentication());
     }
 }

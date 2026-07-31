@@ -7,6 +7,7 @@ use App\Actions\Users\EnsureAdministratorRoleAssignmentIsAuthorized;
 use App\Http\Requests\Users\StoreUserRequest;
 use App\Http\Requests\Users\UpdateUserRequest;
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,7 +37,15 @@ class UserController extends Controller
         $perPage = $this->perPage($request);
 
         $users = User::query()
-            ->select(['id', 'name', 'email', 'created_at'])
+            ->select([
+                'id',
+                'name',
+                'email',
+                'email_verified_at',
+                'two_factor_secret',
+                'two_factor_confirmed_at',
+                'created_at',
+            ])
             ->with(['roles' => fn ($query) => $query
                 ->select(['roles.id', 'name', 'guard_name'])
                 ->orderBy('name')])
@@ -54,6 +63,8 @@ class UserController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at?->toISOString(),
+                'two_factor_enabled' => $user->hasEnabledTwoFactorAuthentication(),
                 'roles' => $user->roles->pluck('name')->values()->all(),
                 'created_at' => $user->created_at?->toISOString(),
             ]);
@@ -84,10 +95,14 @@ class UserController extends Controller
 
         $this->ensureAdministratorRoleAssignmentIsAuthorized->handle($request->user(), $roles);
 
-        DB::transaction(function () use ($data, $roles): void {
+        $user = DB::transaction(function () use ($data, $roles): User {
             $user = User::query()->create($data);
             $user->syncRoles($roles);
+
+            return $user;
         });
+
+        event(new Registered($user));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario creado correctamente.']);
 
@@ -113,17 +128,30 @@ class UserController extends Controller
             Arr::forget($data, 'password');
         }
 
-        DB::transaction(function () use ($user, $data, $roles): void {
+        $emailWasChanged = false;
+
+        DB::transaction(function () use ($user, $data, $roles, &$emailWasChanged): void {
             if ($roles !== null) {
                 $this->ensureAdministratorRemains->handle($user, $roles);
             }
 
-            $user->update($data);
+            $user->fill($data);
+            $emailWasChanged = $user->isDirty('email');
+
+            if ($emailWasChanged) {
+                $user->forceFill(['email_verified_at' => null]);
+            }
+
+            $user->save();
 
             if ($roles !== null) {
                 $user->syncRoles($roles);
             }
         });
+
+        if ($emailWasChanged) {
+            $user->sendEmailVerificationNotification();
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario actualizado correctamente.']);
 

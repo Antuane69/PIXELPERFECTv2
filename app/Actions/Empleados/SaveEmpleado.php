@@ -4,6 +4,7 @@ namespace App\Actions\Empleados;
 
 use App\Models\Empleado;
 use App\Models\EmpleadoDocumento;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,17 @@ class SaveEmpleado
                 $avatar = $data['avatar'] ?? null;
                 $documentos = is_array($data['documentos'] ?? null) ? $data['documentos'] : [];
 
-                $lockedEmpleado->fill(Arr::except($data, ['avatar', 'documentos']));
+                $lockedEmpleado->fill(Arr::except($data, [
+                    'avatar',
+                    'documentos',
+                    'fecha_contrato_siguiente',
+                    'fecha_contrato_indefinido',
+                    'fecha_ultimo_aviso',
+                    'fecha_evaluacion',
+                    'fecha_inicio_contrato',
+                    'fecha_termino_contrato',
+                ]));
+                $this->applyTrialContractDates($lockedEmpleado);
                 $lockedEmpleado->save();
 
                 if ($avatar instanceof UploadedFile) {
@@ -138,6 +149,20 @@ class SaveEmpleado
         }
 
         return $path;
+    }
+
+    private function applyTrialContractDates(Empleado $empleado): void
+    {
+        if ($empleado->fecha_ingreso === null || $empleado->periodo_prueba_meses === null) {
+            return;
+        }
+
+        $fechaIngreso = CarbonImmutable::parse($empleado->fecha_ingreso->toDateString());
+
+        $empleado->fecha_contrato_siguiente = $fechaIngreso->addMonthNoOverflow()->toDateString();
+        $empleado->fecha_contrato_indefinido = $fechaIngreso
+            ->addMonthsNoOverflow((int) $empleado->periodo_prueba_meses)
+            ->toDateString();
     }
 
     private function safeOriginalName(UploadedFile $file): string

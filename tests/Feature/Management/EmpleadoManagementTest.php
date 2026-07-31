@@ -65,6 +65,9 @@ class EmpleadoManagementTest extends TestCase
         $originalAvatarPath = $empleado->avatar;
 
         $this->assertSame('Empleado Inicial', $empleado->nombre);
+        $this->assertSame(3, $empleado->periodo_prueba_meses);
+        $this->assertSame('2024-02-01', $empleado->fecha_contrato_siguiente->toDateString());
+        $this->assertSame('2024-04-01', $empleado->fecha_contrato_indefinido->toDateString());
         $this->assertSame($tipoDocumento->id, $documento->tipo_documento_empleado_id);
         Storage::disk($documento->disco)->assertExists($documento->ruta);
         Storage::disk('local')->assertExists($originalAvatarPath);
@@ -131,6 +134,20 @@ class EmpleadoManagementTest extends TestCase
                 'fecha_nacimiento',
                 'documentos',
             ]);
+
+        $this->assertDatabaseCount('empleados', 0);
+    }
+
+    public function test_employee_validation_rejects_less_than_two_vacation_days_and_more_than_six_trial_months(): void
+    {
+        $puesto = Puesto::factory()->create();
+        $payload = $this->validEmployeePayload($puesto);
+        $payload['dias_vacaciones'] = 1;
+        $payload['periodo_prueba_meses'] = 7;
+
+        $this->actingAs($this->administrator)
+            ->post(route('empleados.store'), $payload)
+            ->assertSessionHasErrors(['dias_vacaciones', 'periodo_prueba_meses']);
 
         $this->assertDatabaseCount('empleados', 0);
     }
@@ -371,12 +388,7 @@ class EmpleadoManagementTest extends TestCase
             'dias_descanso' => ['sabado', 'domingo'],
             'fecha_ingreso' => '2024-01-01',
             'fecha_nacimiento' => '1990-05-10',
-            'fecha_inicio_contrato' => '2024-01-01',
-            'fecha_termino_contrato' => '2024-03-31',
-            'fecha_contrato_siguiente' => '2024-04-01',
-            'fecha_contrato_indefinido' => '2024-07-01',
-            'fecha_ultimo_aviso' => null,
-            'fecha_evaluacion' => '2024-02-01',
+            'periodo_prueba_meses' => 3,
         ];
     }
 }

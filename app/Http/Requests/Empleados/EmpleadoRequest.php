@@ -5,7 +5,6 @@ namespace App\Http\Requests\Empleados;
 use App\Models\Empleado;
 use App\Models\Puesto;
 use App\Models\TipoDocumentoEmpleado;
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
@@ -13,7 +12,6 @@ use Illuminate\Support\Facades\Validator as ValidatorFacade;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\Validator;
-use Throwable;
 
 abstract class EmpleadoRequest extends FormRequest
 {
@@ -27,14 +25,6 @@ abstract class EmpleadoRequest extends FormRequest
         'docx',
         'xls',
         'xlsx',
-    ];
-
-    private const CONTRACT_DATE_LABELS = [
-        'fecha_ingreso' => 'fecha de ingreso',
-        'fecha_inicio_contrato' => 'fecha de inicio del contrato',
-        'fecha_termino_contrato' => 'fecha de término del contrato',
-        'fecha_contrato_siguiente' => 'fecha del contrato siguiente',
-        'fecha_contrato_indefinido' => 'fecha del contrato indefinido',
     ];
 
     /**
@@ -137,7 +127,7 @@ abstract class EmpleadoRequest extends FormRequest
             ],
             'aguinaldo' => [$nullable, 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'prima_vacacional' => [$nullable, 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'dias_vacaciones' => [$nullable, 'nullable', 'integer', 'min:0', 'max:3650'],
+            'dias_vacaciones' => [$required, 'integer', 'min:2', 'max:3650'],
             'dias_liquidacion' => [$nullable, 'nullable', 'integer', 'min:0', 'max:3650'],
             'dias_descanso' => ['sometimes', 'array', 'max:7'],
             'dias_descanso.*' => [
@@ -153,12 +143,7 @@ abstract class EmpleadoRequest extends FormRequest
                 'date_format:Y-m-d',
                 'before_or_equal:'.$minimumBirthDate,
             ],
-            'fecha_contrato_siguiente' => [$nullable, 'nullable', 'date_format:Y-m-d'],
-            'fecha_contrato_indefinido' => [$nullable, 'nullable', 'date_format:Y-m-d'],
-            'fecha_ultimo_aviso' => [$nullable, 'nullable', 'date_format:Y-m-d'],
-            'fecha_evaluacion' => [$nullable, 'nullable', 'date_format:Y-m-d'],
-            'fecha_inicio_contrato' => [$nullable, 'nullable', 'date_format:Y-m-d'],
-            'fecha_termino_contrato' => [$nullable, 'nullable', 'date_format:Y-m-d'],
+            'periodo_prueba_meses' => [$required, 'integer', 'min:1', 'max:6'],
             'documentos' => ['sometimes', 'array'],
             'documentos.*' => ['array:tipo_documento_empleado_id,archivo,vence_el'],
             'documentos.*.tipo_documento_empleado_id' => [
@@ -197,9 +182,6 @@ abstract class EmpleadoRequest extends FormRequest
         return [
             function (Validator $validator): void {
                 $this->validateDocuments($validator);
-            },
-            function (Validator $validator): void {
-                $this->validateDateOrder($validator);
             },
         ];
     }
@@ -258,12 +240,6 @@ abstract class EmpleadoRequest extends FormRequest
             'prima_vacacional',
             'dias_vacaciones',
             'dias_liquidacion',
-            'fecha_contrato_siguiente',
-            'fecha_contrato_indefinido',
-            'fecha_ultimo_aviso',
-            'fecha_evaluacion',
-            'fecha_inicio_contrato',
-            'fecha_termino_contrato',
         ] as $field) {
             if (array_key_exists($field, $data) && $data[$field] === '') {
                 $normalized[$field] = null;
@@ -293,6 +269,11 @@ abstract class EmpleadoRequest extends FormRequest
 
                 return $documento;
             }, $documentos);
+        }
+
+        if ($this->isCreating()) {
+            $normalized['dias_vacaciones'] ??= 2;
+            $normalized['periodo_prueba_meses'] ??= 3;
         }
 
         $this->merge($normalized);
@@ -421,68 +402,6 @@ abstract class EmpleadoRequest extends FormRequest
                     "Debes adjuntar un archivo para el tipo de documento activo: {$type->nombre}.",
                 );
             }
-        }
-    }
-
-    private function validateDateOrder(Validator $validator): void
-    {
-        $previousDate = null;
-        $previousLabel = null;
-
-        foreach (self::CONTRACT_DATE_LABELS as $field => $label) {
-            $date = $this->dateValue($field);
-
-            if ($date === null) {
-                continue;
-            }
-
-            if ($previousDate !== null && $date->isBefore($previousDate)) {
-                $validator->errors()->add(
-                    $field,
-                    "La {$label} debe ser igual o posterior a la {$previousLabel}.",
-                );
-            }
-
-            $previousDate = $date;
-            $previousLabel = $label;
-        }
-
-        $fechaIngreso = $this->dateValue('fecha_ingreso');
-
-        if ($fechaIngreso === null) {
-            return;
-        }
-
-        foreach ([
-            'fecha_ultimo_aviso' => 'La fecha del último aviso',
-            'fecha_evaluacion' => 'La fecha de evaluación',
-        ] as $field => $label) {
-            $date = $this->dateValue($field);
-
-            if ($date !== null && $date->isBefore($fechaIngreso)) {
-                $validator->errors()->add(
-                    $field,
-                    "{$label} debe ser igual o posterior a la fecha de ingreso.",
-                );
-            }
-        }
-    }
-
-    private function dateValue(string $field): ?CarbonImmutable
-    {
-        $data = $this->all();
-        $value = array_key_exists($field, $data)
-            ? $data[$field]
-            : $this->boundEmpleado()?->{$field};
-
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        try {
-            return CarbonImmutable::parse($value);
-        } catch (Throwable) {
-            return null;
         }
     }
 

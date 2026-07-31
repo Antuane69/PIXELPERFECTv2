@@ -4,8 +4,10 @@ namespace Tests\Feature\Management;
 
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -27,6 +29,8 @@ class UserManagementTest extends TestCase
 
     public function test_administrator_can_create_and_update_a_user_with_roles(): void
     {
+        Notification::fake();
+
         $role = Role::findOrCreate('Recursos Humanos', 'web');
 
         $this->actingAs($this->administrator)
@@ -45,6 +49,8 @@ class UserManagementTest extends TestCase
         $this->assertSame('Usuario Gestionado', $user->name);
         $this->assertTrue($user->hasRole($role));
         $this->assertTrue(Hash::check('secret-password', $user->password));
+        $this->assertNull($user->email_verified_at);
+        Notification::assertSentTo($user, VerifyEmail::class);
 
         $this->actingAs($this->administrator)
             ->put(route('users.update', $user), [
@@ -62,6 +68,30 @@ class UserManagementTest extends TestCase
         $this->assertSame('Usuario Actualizado', $user->name);
         $this->assertSame('actualizado@example.com', $user->email);
         $this->assertTrue(Hash::check('secret-password', $user->password));
+    }
+
+    public function test_changing_a_user_email_requires_verification_again(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+        $role = Role::findOrCreate('Recursos Humanos', 'web');
+        $user->assignRole($role);
+
+        $this->actingAs($this->administrator)
+            ->put(route('users.update', $user), [
+                'name' => $user->name,
+                'email' => 'nuevo-correo@example.com',
+                'password' => null,
+                'password_confirmation' => null,
+                'roles' => [$role->id],
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('users.index'));
+
+        $this->assertSame('nuevo-correo@example.com', $user->refresh()->email);
+        $this->assertNull($user->email_verified_at);
+        Notification::assertSentTo($user, VerifyEmail::class);
     }
 
     public function test_user_validation_rejects_duplicate_email_and_invalid_role(): void

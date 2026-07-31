@@ -22,10 +22,11 @@ class EmpleadoFactory extends Factory
     {
         $fechaNacimiento = CarbonImmutable::instance(fake()->dateTimeBetween('-60 years', '-18 years'));
         $fechaIngreso = CarbonImmutable::instance(fake()->dateTimeBetween('-10 years', 'now'));
+        $periodoPruebaMeses = 3;
+        $fechaContratoSiguiente = $fechaIngreso->addMonthNoOverflow();
+        $fechaContratoIndefinido = $fechaIngreso->addMonthsNoOverflow($periodoPruebaMeses);
         $fechaInicioContrato = $fechaIngreso;
-        $fechaTerminoContrato = $fechaInicioContrato->addMonths(3);
-        $fechaContratoSiguiente = $fechaTerminoContrato;
-        $fechaContratoIndefinido = $fechaContratoSiguiente->addMonths(3);
+        $fechaTerminoContrato = $fechaContratoIndefinido;
         $salarioDia = fake()->randomFloat(2, 250, 5000);
 
         return [
@@ -55,7 +56,7 @@ class EmpleadoFactory extends Factory
             'salario_vacaciones_finiquito' => fake()->randomFloat(2, 0, 100000),
             'aguinaldo' => fake()->randomFloat(2, 0, 100000),
             'prima_vacacional' => fake()->randomFloat(2, 0, 100000),
-            'dias_vacaciones' => fake()->numberBetween(0, 30),
+            'dias_vacaciones' => fake()->numberBetween(2, 30),
             'dias_liquidacion' => fake()->numberBetween(0, 90),
             'dias_descanso' => fake()->randomElements(
                 ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'],
@@ -63,6 +64,7 @@ class EmpleadoFactory extends Factory
             ),
             'fecha_ingreso' => $fechaIngreso->toDateString(),
             'fecha_nacimiento' => $fechaNacimiento->toDateString(),
+            'periodo_prueba_meses' => $periodoPruebaMeses,
             'fecha_contrato_siguiente' => $fechaContratoSiguiente->toDateString(),
             'fecha_contrato_indefinido' => $fechaContratoIndefinido->toDateString(),
             'fecha_ultimo_aviso' => null,

@@ -3,8 +3,12 @@
 namespace App\Providers;
 
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -30,6 +34,7 @@ class FortifyServiceProvider extends ServiceProvider
     {
         $this->configureActions();
         $this->configureViews();
+        $this->configureNotifications();
         $this->configureRateLimiting();
     }
 
@@ -61,13 +66,58 @@ class FortifyServiceProvider extends ServiceProvider
             'status' => $request->session()->get('status'),
         ]));
 
-        Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/verify-email', [
-            'status' => $request->session()->get('status'),
-        ]));
+        Fortify::verifyEmailView(function (Request $request) {
+            $user = $request->user();
+
+            if (
+                $user instanceof User
+                && ! $user->hasVerifiedEmail()
+                && ! $request->session()->has('verification_email_sent')
+            ) {
+                $user->sendEmailVerificationNotification();
+                $request->session()->put('verification_email_sent', true);
+            }
+
+            return Inertia::render('auth/verify-email', [
+                'status' => $request->session()->get('status'),
+            ]);
+        });
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/two-factor-challenge'));
 
         Fortify::confirmPasswordView(fn () => Inertia::render('auth/confirm-password'));
+    }
+
+    /**
+     * Configure authentication email notifications.
+     */
+    private function configureNotifications(): void
+    {
+        VerifyEmail::toMailUsing(
+            static fn (User $user, string $verificationUrl): MailMessage => (new MailMessage)
+                ->subject('Verifica tu correo electrónico')
+                ->greeting("Hola, {$user->name}")
+                ->line('Confirma que este correo electrónico pertenece a tu cuenta de Pixel Perfect.')
+                ->action('Verificar correo electrónico', $verificationUrl)
+                ->line('Si no esperabas este mensaje, puedes ignorarlo.'),
+        );
+
+        ResetPassword::toMailUsing(function (User $user, string $token): MailMessage {
+            $resetUrl = url(route('password.reset', [
+                'token' => $token,
+                'email' => $user->getEmailForPasswordReset(),
+            ], false));
+
+            $expiresInMinutes = (int) config('auth.passwords.users.expire', 60);
+
+            return (new MailMessage)
+                ->subject('Restablece tu contraseña')
+                ->greeting("Hola, {$user->name}")
+                ->line('Recibimos una solicitud para restablecer la contraseña de tu cuenta.')
+                ->action('Restablecer contraseña', $resetUrl)
+                ->line("Este enlace vencerá en {$expiresInMinutes} minutos.")
+                ->line('Si no solicitaste el cambio, no necesitas realizar ninguna acción.');
+        });
     }
 
     /**

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Jobs\SendEmailVerificationEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -11,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Activitylog\LogOptions;
@@ -32,12 +35,35 @@ use Spatie\Permission\Traits\HasRoles;
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, LogsActivity, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, HasRoles, LogsActivity, MustVerifyEmailTrait, Notifiable, TwoFactorAuthenticatable;
 
     protected string $guard_name = 'web';
+
+    /**
+     * Queue the branded verification email.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            Carbon::now()->addMinutes((int) config('auth.verification.expire', 60)),
+            [
+                'id' => $this->getKey(),
+                'hash' => sha1($this->getEmailForVerification()),
+            ],
+        );
+
+        SendEmailVerificationEmail::dispatch(
+            name: $this->name,
+            email: $this->getEmailForVerification(),
+            verificationUrl: $verificationUrl,
+        )
+            ->onQueue((string) config('mail.auth.queue'))
+            ->afterCommit();
+    }
 
     public function getActivitylogOptions(): LogOptions
     {

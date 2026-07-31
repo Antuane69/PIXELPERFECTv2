@@ -64,12 +64,9 @@ class EmpleadoController extends Controller
                 'dias_descanso',
                 'fecha_ingreso',
                 'fecha_nacimiento',
+                'periodo_prueba_meses',
                 'fecha_contrato_siguiente',
                 'fecha_contrato_indefinido',
-                'fecha_ultimo_aviso',
-                'fecha_evaluacion',
-                'fecha_inicio_contrato',
-                'fecha_termino_contrato',
                 'created_at',
                 'updated_at',
                 'deleted_at',
@@ -121,7 +118,7 @@ class EmpleadoController extends Controller
         return Inertia::render('empleados/index', [
             'empleados' => $empleados,
             'puestos' => Puesto::query()
-                ->select(['id', 'nombre', 'activo'])
+                ->select(['id', 'nombre', 'salario_dia', 'salario_quincena', 'activo'])
                 ->orderBy('nombre')
                 ->get(),
             'tiposDocumento' => TipoDocumentoEmpleado::query()
@@ -237,12 +234,9 @@ class EmpleadoController extends Controller
             'dias_descanso' => $empleado->dias_descanso,
             'fecha_ingreso' => $this->date($empleado->fecha_ingreso),
             'fecha_nacimiento' => $this->date($empleado->fecha_nacimiento),
+            'periodo_prueba_meses' => $empleado->periodo_prueba_meses,
             'fecha_contrato_siguiente' => $this->date($empleado->fecha_contrato_siguiente),
             'fecha_contrato_indefinido' => $this->date($empleado->fecha_contrato_indefinido),
-            'fecha_ultimo_aviso' => $this->date($empleado->fecha_ultimo_aviso),
-            'fecha_evaluacion' => $this->date($empleado->fecha_evaluacion),
-            'fecha_inicio_contrato' => $this->date($empleado->fecha_inicio_contrato),
-            'fecha_termino_contrato' => $this->date($empleado->fecha_termino_contrato),
             'puesto' => $empleado->puesto === null ? null : [
                 'id' => $empleado->puesto->id,
                 'nombre' => $empleado->puesto->nombre,

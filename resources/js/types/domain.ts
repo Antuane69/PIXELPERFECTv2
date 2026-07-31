@@ -36,6 +36,8 @@ export type ManagedUser = {
     id: number;
     name: string;
     email: string;
+    email_verified_at: string | null;
+    two_factor_enabled: boolean;
     roles?: Array<Role | string>;
     created_at?: string | null;
 };
@@ -99,12 +101,9 @@ export type Empleado = {
     dias_descanso?: string[];
     fecha_nacimiento?: string | null;
     fecha_ingreso?: string | null;
+    periodo_prueba_meses?: number | null;
     fecha_contrato_siguiente?: string | null;
     fecha_contrato_indefinido?: string | null;
-    fecha_ultimo_aviso?: string | null;
-    fecha_evaluacion?: string | null;
-    fecha_inicio_contrato?: string | null;
-    fecha_termino_contrato?: string | null;
     documentos?: EmpleadoDocumento[];
     deleted_at?: string | null;
 };
