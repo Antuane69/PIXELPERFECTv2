@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,6 +22,8 @@ use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
+    private const INDEX_QUERY_PARAMETERS = ['search', 'per_page', 'page'];
+
     public function __construct(
         private readonly EnsureAdministratorRemains $ensureAdministratorRemains,
         private readonly EnsureAdministratorRoleAssignmentIsAuthorized $ensureAdministratorRoleAssignmentIsAuthorized,
@@ -80,6 +83,7 @@ class UserController extends Controller
                 'search' => $search,
                 'perPage' => $perPage,
             ],
+            'passwordRules' => Password::defaults()->toPasswordRulesString(),
         ]);
     }
 
@@ -106,7 +110,7 @@ class UserController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario creado correctamente.']);
 
-        return to_route('users.index');
+        return $this->redirectToResourceIndex($request, 'users.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**
@@ -155,7 +159,7 @@ class UserController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario actualizado correctamente.']);
 
-        return to_route('users.index');
+        return $this->redirectToResourceIndex($request, 'users.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**
@@ -178,7 +182,7 @@ class UserController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario eliminado correctamente.']);
 
-        return to_route('users.index');
+        return $this->redirectToResourceIndex($request, 'users.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     private function perPage(Request $request): int

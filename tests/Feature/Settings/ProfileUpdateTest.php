@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Jobs\SendEmailVerificationEmail;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class ProfileUpdateTest extends TestCase
@@ -26,7 +26,7 @@ class ProfileUpdateTest extends TestCase
 
     public function test_profile_information_can_be_updated()
     {
-        Notification::fake();
+        Queue::fake();
 
         $user = User::factory()->create();
 
@@ -46,12 +46,15 @@ class ProfileUpdateTest extends TestCase
         $this->assertSame('Test User', $user->name);
         $this->assertSame('test@example.com', $user->email);
         $this->assertNull($user->email_verified_at);
-        Notification::assertSentTo($user, VerifyEmail::class);
+        Queue::assertPushed(
+            SendEmailVerificationEmail::class,
+            fn (SendEmailVerificationEmail $job): bool => $job->email === $user->email,
+        );
     }
 
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged()
     {
-        Notification::fake();
+        Queue::fake();
 
         $user = User::factory()->create();
 
@@ -67,7 +70,7 @@ class ProfileUpdateTest extends TestCase
             ->assertRedirect(route('profile.edit'));
 
         $this->assertNotNull($user->refresh()->email_verified_at);
-        Notification::assertNothingSent();
+        Queue::assertNothingPushed();
     }
 
     public function test_user_can_delete_their_account()

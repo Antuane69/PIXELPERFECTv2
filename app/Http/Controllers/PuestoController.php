@@ -15,6 +15,8 @@ use Inertia\Response;
 
 class PuestoController extends Controller
 {
+    private const INDEX_QUERY_PARAMETERS = ['search', 'activo', 'archivados', 'per_page', 'page'];
+
     /**
      * Display a paginated position listing.
      */
@@ -70,7 +72,7 @@ class PuestoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Puesto creado correctamente.']);
 
-        return to_route('puestos.index');
+        return $this->redirectToResourceIndex($request, 'puestos.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**
@@ -84,13 +86,13 @@ class PuestoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Puesto actualizado correctamente.']);
 
-        return to_route('puestos.index');
+        return $this->redirectToResourceIndex($request, 'puestos.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**
      * Soft delete the specified position when it is unused.
      */
-    public function destroy(Puesto $puesto): RedirectResponse
+    public function destroy(Request $request, Puesto $puesto): RedirectResponse
     {
         Gate::authorize('delete', $puesto);
 
@@ -104,13 +106,13 @@ class PuestoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Puesto eliminado correctamente.']);
 
-        return to_route('puestos.index');
+        return $this->redirectToResourceIndex($request, 'puestos.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**
      * Restore the specified archived position.
      */
-    public function restore(Puesto $puesto): RedirectResponse
+    public function restore(Request $request, Puesto $puesto): RedirectResponse
     {
         Gate::authorize('restore', $puesto);
 
@@ -118,7 +120,12 @@ class PuestoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Puesto restaurado correctamente.']);
 
-        return to_route('puestos.index', ['archivados' => true]);
+        return $this->redirectToResourceIndex(
+            $request,
+            'puestos.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['archivados' => true],
+        );
     }
 
     private function perPage(Request $request): int

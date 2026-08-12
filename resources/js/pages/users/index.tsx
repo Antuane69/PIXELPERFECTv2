@@ -9,6 +9,8 @@ import {
 } from '@/actions/App/Http/Controllers/UserController';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import InputError from '@/components/input-error';
+import PasswordInput from '@/components/password-input';
+import PasswordStrengthInput from '@/components/password-strength-input';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
 import { ResourceHeader } from '@/components/resource-header';
 import { ResourcePagination } from '@/components/resource-pagination';
@@ -28,12 +30,18 @@ type Props = {
     users: LaravelPaginator<ManagedUser>;
     roles: Role[];
     filters?: { search?: string };
+    passwordRules: string;
 };
 
 const roleName = (role: Role | string) =>
     typeof role === 'string' ? role : role.name;
 
-export default function UsersIndex({ users, roles, filters }: Props) {
+export default function UsersIndex({
+    users,
+    roles,
+    filters,
+    passwordRules,
+}: Props) {
     const { can } = usePermissions();
     const canAssignRoles = can('users.assign_roles');
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -178,6 +186,7 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                     roles={roles}
                     assignedRoles={assignedRoles}
                     canAssignRoles={canAssignRoles}
+                    passwordRules={passwordRules}
                 />
             )}
 
@@ -200,6 +209,7 @@ function UserDialog({
     roles,
     assignedRoles,
     canAssignRoles,
+    passwordRules,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -207,6 +217,7 @@ function UserDialog({
     roles: Role[];
     assignedRoles: Set<string | number>;
     canAssignRoles: boolean;
+    passwordRules: string;
 }) {
     const formId = 'user-form';
     const route = user ? update.form(user.id) : store.form();
@@ -251,12 +262,12 @@ function UserDialog({
                         <Label htmlFor="user-password">
                             Contraseña {user ? '(opcional)' : ''}
                         </Label>
-                        <Input
+                        <PasswordStrengthInput
                             id="user-password"
-                            type="password"
                             name="password"
                             required={!user}
                             autoComplete="new-password"
+                            passwordrules={passwordRules}
                         />
                         <InputError message={errors.password} />
                     </div>
@@ -264,12 +275,12 @@ function UserDialog({
                         <Label htmlFor="user-password-confirmation">
                             Confirmar contraseña {user ? '(opcional)' : ''}
                         </Label>
-                        <Input
+                        <PasswordInput
                             id="user-password-confirmation"
-                            type="password"
                             name="password_confirmation"
                             required={!user}
                             autoComplete="new-password"
+                            passwordrules={passwordRules}
                         />
                         <InputError message={errors.password_confirmation} />
                     </div>

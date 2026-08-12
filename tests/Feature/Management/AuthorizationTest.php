@@ -93,8 +93,8 @@ class AuthorizationTest extends TestCase
             ->post(route('users.store'), [
                 'name' => 'Escalated User',
                 'email' => 'escalated@example.com',
-                'password' => 'secret-password',
-                'password_confirmation' => 'secret-password',
+                'password' => 'Secure-password1!',
+                'password_confirmation' => 'Secure-password1!',
                 'roles' => [$administratorRole->id],
             ])
             ->assertSessionHasErrors('roles');
@@ -108,8 +108,8 @@ class AuthorizationTest extends TestCase
             ->put(route('users.update', $administrator), [
                 'name' => 'Taken Over',
                 'email' => $administrator->email,
-                'password' => 'new-secret-password',
-                'password_confirmation' => 'new-secret-password',
+                'password' => 'New-secure-password1!',
+                'password_confirmation' => 'New-secure-password1!',
                 'roles' => [$administratorRole->id],
             ])
             ->assertForbidden();

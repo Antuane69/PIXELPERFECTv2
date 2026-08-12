@@ -27,7 +27,16 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
 
     public function test_administrator_can_create_update_and_soft_delete_a_document_type(): void
     {
+        $filteredIndex = route('tipos-documento-empleados.index', [
+            'search' => 'Identificación',
+            'activo' => true,
+            'es_renovable' => true,
+            'per_page' => 25,
+            'page' => 2,
+        ]);
+
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->post(route('tipos-documento-empleados.store'), [
                 'nombre' => 'Identificación oficial',
                 'es_renovable' => true,
@@ -37,7 +46,7 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
                 'activo' => true,
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('tipos-documento-empleados.index'));
+            ->assertRedirect($filteredIndex);
 
         $tipoDocumento = TipoDocumentoEmpleado::query()
             ->where('nombre', 'Identificación oficial')
@@ -46,6 +55,7 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
         $this->assertSame(['PDF', 'JPG'], $tipoDocumento->documentos_aceptados);
 
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->put(route('tipos-documento-empleados.update', $tipoDocumento), [
                 'nombre' => 'Identificación vigente',
                 'es_renovable' => false,
@@ -53,7 +63,7 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
                 'activo' => false,
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('tipos-documento-empleados.index'));
+            ->assertRedirect($filteredIndex);
 
         $tipoDocumento->refresh();
 
@@ -63,9 +73,10 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
         $this->assertNull($tipoDocumento->frecuencia_tipo);
 
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->delete(route('tipos-documento-empleados.destroy', $tipoDocumento))
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('tipos-documento-empleados.index'));
+            ->assertRedirect($filteredIndex);
 
         $this->assertSoftDeleted($tipoDocumento);
     }
@@ -133,6 +144,11 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
         TipoDocumentoEmpleado::factory()->create(['nombre' => 'Tipo vigente']);
         $archivedType = TipoDocumentoEmpleado::factory()->create(['nombre' => 'Tipo archivado']);
         $archivedType->delete();
+        $archivedIndex = route('tipos-documento-empleados.index', [
+            'archivados' => true,
+            'search' => 'Tipo',
+            'page' => 2,
+        ]);
 
         $this->actingAs($this->administrator)
             ->get(route('tipos-documento-empleados.index', ['archivados' => true]))
@@ -145,9 +161,10 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
             );
 
         $this->actingAs($this->administrator)
+            ->from($archivedIndex)
             ->patch(route('tipos-documento-empleados.restore', $archivedType))
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('tipos-documento-empleados.index', ['archivados' => true]));
+            ->assertRedirect($archivedIndex);
 
         $this->assertNotSoftDeleted($archivedType);
     }

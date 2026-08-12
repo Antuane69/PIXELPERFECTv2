@@ -64,11 +64,12 @@ class PasswordResetTest extends TestCase
         $this->post(route('password.email'), ['email' => $user->email]);
 
         Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
+            $newPassword = 'Secure-password1!';
             $response = $this->post(route('password.update'), [
                 'token' => $notification->token,
                 'email' => $user->email,
-                'password' => 'password',
-                'password_confirmation' => 'password',
+                'password' => $newPassword,
+                'password_confirmation' => $newPassword,
             ]);
 
             $response
@@ -86,10 +87,32 @@ class PasswordResetTest extends TestCase
         $response = $this->post(route('password.update'), [
             'token' => 'invalid-token',
             'email' => $user->email,
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
+            'password' => 'Secure-password1!',
+            'password_confirmation' => 'Secure-password1!',
         ]);
 
         $response->assertSessionHasErrors('email');
+    }
+
+    public function test_password_cannot_be_reset_with_a_weak_password(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+
+        $this->post(route('password.email'), ['email' => $user->email]);
+
+        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
+            $response = $this->post(route('password.update'), [
+                'token' => $notification->token,
+                'email' => $user->email,
+                'password' => 'weak-password',
+                'password_confirmation' => 'weak-password',
+            ]);
+
+            $response->assertSessionHasErrors('password');
+
+            return true;
+        });
     }
 }

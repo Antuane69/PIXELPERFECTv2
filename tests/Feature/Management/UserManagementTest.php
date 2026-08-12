@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Management;
 
+use App\Jobs\SendEmailVerificationEmail;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -29,30 +29,41 @@ class UserManagementTest extends TestCase
 
     public function test_administrator_can_create_and_update_a_user_with_roles(): void
     {
-        Notification::fake();
+        Queue::fake();
 
         $role = Role::findOrCreate('Recursos Humanos', 'web');
+        $password = 'Secure-password1!';
+        $filteredIndex = route('users.index', [
+            'search' => 'Gestionado',
+            'per_page' => 25,
+            'page' => 2,
+        ]);
 
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->post(route('users.store'), [
                 'name' => '  Usuario   Gestionado  ',
                 'email' => ' Gestionado@Example.COM ',
-                'password' => 'secret-password',
-                'password_confirmation' => 'secret-password',
+                'password' => $password,
+                'password_confirmation' => $password,
                 'roles' => [$role->id],
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('users.index'));
+            ->assertRedirect($filteredIndex);
 
         $user = User::query()->where('email', 'gestionado@example.com')->firstOrFail();
 
         $this->assertSame('Usuario Gestionado', $user->name);
         $this->assertTrue($user->hasRole($role));
-        $this->assertTrue(Hash::check('secret-password', $user->password));
+        $this->assertTrue(Hash::check($password, $user->password));
         $this->assertNull($user->email_verified_at);
-        Notification::assertSentTo($user, VerifyEmail::class);
+        Queue::assertPushed(
+            SendEmailVerificationEmail::class,
+            fn (SendEmailVerificationEmail $job): bool => $job->email === $user->email,
+        );
 
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->put(route('users.update', $user), [
                 'name' => 'Usuario Actualizado',
                 'email' => 'actualizado@example.com',
@@ -61,18 +72,18 @@ class UserManagementTest extends TestCase
                 'roles' => [$role->id],
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('users.index'));
+            ->assertRedirect($filteredIndex);
 
         $user->refresh();
 
         $this->assertSame('Usuario Actualizado', $user->name);
         $this->assertSame('actualizado@example.com', $user->email);
-        $this->assertTrue(Hash::check('secret-password', $user->password));
+        $this->assertTrue(Hash::check($password, $user->password));
     }
 
     public function test_changing_a_user_email_requires_verification_again(): void
     {
-        Notification::fake();
+        Queue::fake();
 
         $user = User::factory()->create();
         $role = Role::findOrCreate('Recursos Humanos', 'web');
@@ -91,7 +102,10 @@ class UserManagementTest extends TestCase
 
         $this->assertSame('nuevo-correo@example.com', $user->refresh()->email);
         $this->assertNull($user->email_verified_at);
-        Notification::assertSentTo($user, VerifyEmail::class);
+        Queue::assertPushed(
+            SendEmailVerificationEmail::class,
+            fn (SendEmailVerificationEmail $job): bool => $job->email === $user->email,
+        );
     }
 
     public function test_user_validation_rejects_duplicate_email_and_invalid_role(): void

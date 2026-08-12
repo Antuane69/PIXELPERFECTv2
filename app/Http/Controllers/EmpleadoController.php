@@ -21,6 +21,15 @@ use Inertia\Response;
 
 class EmpleadoController extends Controller
 {
+    private const INDEX_QUERY_PARAMETERS = [
+        'search',
+        'puesto_id',
+        'estado_civil',
+        'archivados',
+        'per_page',
+        'page',
+    ];
+
     public function __construct(
         private readonly SaveEmpleado $saveEmpleado,
         private readonly DeleteEmpleado $deleteEmpleado,
@@ -154,13 +163,13 @@ class EmpleadoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Empleado creado correctamente.']);
 
-        return to_route('empleados.index');
+        return $this->redirectToResourceIndex($request, 'empleados.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**
      * Restore the specified archived employee and its private records.
      */
-    public function restore(Empleado $empleado): RedirectResponse
+    public function restore(Request $request, Empleado $empleado): RedirectResponse
     {
         Gate::authorize('restore', $empleado);
 
@@ -168,7 +177,12 @@ class EmpleadoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Empleado restaurado correctamente.']);
 
-        return to_route('empleados.index', ['archivados' => true]);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empleados.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['archivados' => true],
+        );
     }
 
     /**
@@ -185,13 +199,13 @@ class EmpleadoController extends Controller
             'message' => 'Empleado actualizado correctamente.',
         ]);
 
-        return to_route('empleados.index');
+        return $this->redirectToResourceIndex($request, 'empleados.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**
      * Soft delete the specified employee while preserving its private records.
      */
-    public function destroy(Empleado $empleado): RedirectResponse
+    public function destroy(Request $request, Empleado $empleado): RedirectResponse
     {
         Gate::authorize('delete', $empleado);
 
@@ -199,7 +213,7 @@ class EmpleadoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Empleado eliminado correctamente.']);
 
-        return to_route('empleados.index');
+        return $this->redirectToResourceIndex($request, 'empleados.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**

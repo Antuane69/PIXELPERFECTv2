@@ -41,7 +41,7 @@ abstract class EmpleadoRequest extends FormRequest
             ->pluck('tipo_documento_empleado_id')
             ->all() ?? [];
 
-        return [
+        $rules = [
             'nombre' => [$required, 'required', 'string', 'min:3', 'max:120'],
             'nombre_usuario' => [
                 $required,
@@ -64,7 +64,7 @@ abstract class EmpleadoRequest extends FormRequest
                 'required',
                 'string',
                 'size:18',
-                'regex:/^[A-Z][AEIOUX][A-Z]{2}\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[HM][A-Z]{2}[BCDFGHJKLMNPQRSTVWXYZ]{3}[A-Z\d]\d$/',
+                'regex:/^[A-Z][AEIOUX][A-Z]{2}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[HM][A-Z]{2}[BCDFGHJKLMNPQRSTVWXYZ]{3}[A-Z0-9][0-9]$/',
                 $this->uniqueRule('curp'),
             ],
             'rfc' => [
@@ -79,7 +79,7 @@ abstract class EmpleadoRequest extends FormRequest
                 $nullable,
                 'nullable',
                 'string',
-                'regex:/^\d{11}$/',
+                'regex:/^[0-9]{11}$/',
                 $this->uniqueRule('nss'),
             ],
             'num_clinica_ss' => [$nullable, 'nullable', 'string', 'max:120'],
@@ -114,21 +114,25 @@ abstract class EmpleadoRequest extends FormRequest
                 Rule::in(['masculino', 'femenino', 'otro']),
             ],
             'domicilio' => [$required, 'required', 'string', 'min:10', 'max:250'],
-            'telefono' => [$required, 'required', 'string', 'regex:/^\d{10}$/'],
+            'telefono' => [$required, 'required', 'string', 'regex:/^[0-9]{10}$/'],
             'avatar' => [$nullable, 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
-            'salario_dia' => [$nullable, 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'salario_quincena' => [$nullable, 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'salario_vacaciones_finiquito' => [
+            'salario_dia' => [
                 $nullable,
                 'nullable',
                 'numeric',
+                'decimal:0,2',
                 'min:0',
                 'max:9999999999.99',
             ],
-            'aguinaldo' => [$nullable, 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'prima_vacacional' => [$nullable, 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            'salario_quincena' => [
+                $nullable,
+                'nullable',
+                'numeric',
+                'decimal:0,2',
+                'min:0',
+                'max:9999999999.99',
+            ],
             'dias_vacaciones' => [$required, 'integer', 'min:2', 'max:3650'],
-            'dias_liquidacion' => [$nullable, 'nullable', 'integer', 'min:0', 'max:3650'],
             'dias_descanso' => ['sometimes', 'array', 'max:7'],
             'dias_descanso.*' => [
                 'required',
@@ -172,6 +176,41 @@ abstract class EmpleadoRequest extends FormRequest
             ],
             'documentos.*.vence_el' => ['nullable', 'date_format:Y-m-d'],
         ];
+
+        if (! $this->isCreating()) {
+            $rules += [
+                'salario_vacaciones_finiquito' => [
+                    'sometimes',
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                    'max:9999999999.99',
+                ],
+                'aguinaldo' => [
+                    'sometimes',
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                    'max:9999999999.99',
+                ],
+                'prima_vacacional' => [
+                    'sometimes',
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                    'max:9999999999.99',
+                ],
+                'dias_liquidacion' => [
+                    'sometimes',
+                    'nullable',
+                    'integer',
+                    'min:0',
+                    'max:3650',
+                ],
+            ];
+        }
+
+        return $rules;
     }
 
     /**
@@ -272,8 +311,11 @@ abstract class EmpleadoRequest extends FormRequest
         }
 
         if ($this->isCreating()) {
-            $normalized['dias_vacaciones'] ??= 2;
-            $normalized['periodo_prueba_meses'] ??= 3;
+            $normalized['dias_vacaciones'] = 2;
+
+            if (! array_key_exists('periodo_prueba_meses', $data)) {
+                $normalized['periodo_prueba_meses'] = 3;
+            }
         }
 
         $this->merge($normalized);

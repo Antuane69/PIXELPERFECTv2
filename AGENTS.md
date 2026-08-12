@@ -48,6 +48,103 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Stick to existing directory structure; don't create new base folders without approval.
 - Do not change the application's dependencies without approval.
 
+## New Module Standard
+
+Every new module must use the existing application as its contract. Choose references by behavior, not only by name:
+
+- Use `Puestos` for a simple catalog with active/inactive state, soft deletes, restore, search, filters, and pagination.
+- Use `Tipos de documento de empleados` for a catalog with conditional fields, arrays, domain validation, archived records, and relationships that restrict deletion.
+- Use `Usuarios` and `Roles` for permissions, protected records, role assignment, transactions, and queued email verification.
+- Use `Empleados` for complex forms, private files, child records, atomic mutations, restore rules, and responsive tables.
+- Reuse the smallest compatible pattern. Do not copy unrelated fields, rules, or abstractions from a reference module.
+
+### Define the Module Contract First
+
+Before implementation, enumerate:
+
+- screens, CRUD operations, special actions, and expected redirects;
+- fields, nullable values, defaults, normalization, enums, dates, money, and files;
+- relationships, deletion behavior, archive/restore rules, and concurrency risks;
+- actors, permissions, visibility rules, and protected records;
+- table columns, search fields, filters, default sort, page size, empty state, and mobile presentation;
+- success, validation, authorization, empty, loading, error, and archived states;
+- required side effects such as activity logs, email, queues, or external APIs.
+
+Unknown business rules must be marked as `No verificable` and confirmed before persisting data or changing compatibility.
+
+### Backend Requirements
+
+- Create Laravel files with `php artisan make:* --no-interaction` when applicable.
+- New persisted domain models normally require a migration, model, factory, and useful seeder or explicit decision that a seeder is not applicable.
+- Migrations must define correct types, precision, nullability, defaults, foreign keys, delete rules, unique constraints, and indexes matching real filters and sorts.
+- Models must define mass-assignment protection, casts, inverse relationships, soft deletes when required, and safe activity-log fields.
+- Use separate Form Requests for create and update when rules differ. Normalize input in `prepareForValidation()`, authorize server-side, and consume only `validated()` data.
+- Defaults apply only when a field is omitted. Never overwrite a non-empty client value during normalization.
+- Controllers authorize, call an Action or Service, flash feedback, and build the response. Transactions, file storage, relation synchronization, locks, and non-trivial domain rules belong in focused Actions or Services.
+- Use database transactions for atomic mutations. Coordinate stored-file cleanup because a database rollback does not delete files.
+- Private or sensitive files stay on a private disk and are served only through authorized, scoped routes. Validate extension, MIME type, size, generated storage name, and download ownership.
+- Protect every list, create, update, delete, restore, download, and special action with a Policy, Gate, or authorized Form Request.
+- Add permissions to `RolesAndPermissionsSeeder`; permission names must match Policies, shared Inertia props, navigation, and frontend visibility.
+- Use named routes, implicit binding, and scoped bindings for child resources.
+
+### Table, Search, Filter, and Pagination Requirements
+
+Every index table must:
+
+- select only required columns, eager-load displayed relationships, avoid N+1 queries, and use deterministic ordering;
+- normalize search text and explicitly define searchable columns;
+- validate or safely coerce every filter accepted from the URL;
+- use a bounded page size, normally `min(max($request->integer('per_page', 15), 1), 100)`;
+- use `paginate($perPage)->withQueryString()` and return a typed Laravel paginator;
+- return normalized `filters` props matching frontend TypeScript names and nullability;
+- keep search, filters, archived state, `per_page`, and `page` in the URL;
+- preserve allowed listing context after successful create, update, delete, and restore through `Controller::redirectToResourceIndex()` plus a per-controller allowlist;
+- expose every user-facing backend filter through a labeled UI control. A backend-only filter is allowed only when intentionally reserved and documented;
+- include a clear-filter action and show an appropriate empty state for filtered and archived results;
+- use `ResourceTable` and `ResourcePagination` unless the module has a documented incompatible requirement;
+- provide an accessible mobile alternative, accessible names for icon-only actions and pagination controls, visible focus, and feedback not based only on color.
+
+Pagination is not considered verified by checking `per_page` alone. Tests must create enough records for multiple pages, navigate to another page, and assert that active search/filter query parameters remain in paginator links and responses.
+
+### Inertia React Requirements
+
+- Use Wayfinder imports from `@/actions` or `@/routes`; never hardcode application URLs.
+- Use Inertia v3 `<Form>`, `useForm`, `useHttp`, `<Link>`, or `router` patterns. Do not introduce Axios.
+- Reuse shared building blocks before creating module-specific JSX: `ResourceHeader`, `ResourceSearch`, `ResourceTable`, `ResourcePagination`, `ResourceFormDialog`, `ConfirmDeleteDialog`, `ArchivedRecordsToggle`, and `RestoreButton`.
+- Keep pages as composition layers. Put reusable domain-specific form or table parts under `resources/js/features/<module>/` or the established compatible module folder.
+- Keep server data in Inertia props and transient UI state in React. Do not duplicate server truth in local state.
+- Type props, paginators, nullable fields, relations, filters, permissions, and validation errors accurately.
+- Forms must show field errors, prevent duplicate submission, communicate processing, close only on success, and preserve relevant listing context.
+- Cover loading, empty, validation, network/HTTP error, disabled, success, archived, and permission states when applicable.
+- Follow Tailwind CSS v4 and existing dark-mode/responsive conventions. Do not add parallel CSS or new UI dependencies without approval.
+
+### Test Requirements Per Module
+
+Use PHPUnit feature tests and factories. At minimum cover:
+
+- authorized happy paths for create, update, delete, restore, and special actions;
+- forbidden access for users missing each relevant permission;
+- required, conditional, unique, normalized, boundary, and invalid relation inputs;
+- protected-record and last-administrator rules when applicable;
+- search, every exposed filter, archived records, deterministic ordering, page-size bounds, multi-page navigation, and query-string preservation;
+- database state, relationships, files, responses, flash data, redirects, and essential Inertia props;
+- file MIME/size rejection, scoped download authorization, missing files, replacement cleanup, and rollback behavior when files apply;
+- queued notifications with `Queue::fake()` and the actual queued Job contract when the application does not use Laravel's default Notification;
+- edge cases for null relations, deleted parents, restore prerequisites, duplicate requests, and real concurrency risks.
+
+### Definition of Done
+
+A module is complete only when:
+
+- route, validation, authorization, Action or Service, model, database, Inertia response, TypeScript, UI state, and tests form one verified contract;
+- affected PHPUnit tests pass;
+- `vendor/bin/pint --dirty --format agent` has been run after PHP changes;
+- PHPStan passes for backend changes;
+- `npm run types:check`, lint, and format checks pass for frontend changes;
+- `npm run build` passes when imports, JSX, styles, routes, or assets change;
+- full `composer ci:check` passes before using the module as a reference for future modules;
+- no filter exists only accidentally in backend, no route is hardcoded, and no sensitive file is publicly exposed.
+
 ## Frontend Bundling
 
 - If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.

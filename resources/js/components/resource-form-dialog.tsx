@@ -27,6 +27,7 @@ type ResourceFormDialogProps = {
     submitLabel?: string;
     className?: string;
     resetOnSuccess?: boolean;
+    noValidate?: boolean;
 };
 
 export function ResourceFormDialog({
@@ -40,6 +41,7 @@ export function ResourceFormDialog({
     submitLabel = 'Guardar',
     className,
     resetOnSuccess = false,
+    noValidate = false,
 }: ResourceFormDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -56,12 +58,22 @@ export function ResourceFormDialog({
                     onSuccess={() => onOpenChange(false)}
                     resetOnSuccess={resetOnSuccess}
                     disableWhileProcessing
+                    noValidate={noValidate}
                 >
-                    {({ processing, errors }) => (
+                    {({ processing, errors, hasErrors }) => (
                         <>
                             <div className="min-h-0 flex-1 overflow-y-auto px-1 py-1">
                                 {children(errors as Record<string, string>)}
                             </div>
+                            {hasErrors ? (
+                                <p
+                                    className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                                    role="alert"
+                                >
+                                    No se pudo guardar. Revisa los campos
+                                    marcados.
+                                </p>
+                            ) : null}
                             <DialogFooter>
                                 <Button
                                     type="button"

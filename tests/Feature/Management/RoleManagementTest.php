@@ -29,25 +29,32 @@ class RoleManagementTest extends TestCase
     {
         $viewPermission = Permission::findByName('users.view', 'web');
         $createPermission = Permission::findByName('users.create', 'web');
+        $filteredIndex = route('roles.index', [
+            'search' => 'Supervisor',
+            'per_page' => 25,
+            'page' => 2,
+        ]);
 
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->post(route('roles.store'), [
                 'name' => '  Supervisor  ',
                 'permissions' => [$viewPermission->id],
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('roles.index'));
+            ->assertRedirect($filteredIndex);
 
         $role = Role::findByName('Supervisor', 'web');
         $this->assertTrue($role->hasPermissionTo($viewPermission));
 
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->put(route('roles.update', $role), [
                 'name' => 'Supervisor General',
                 'permissions' => [$viewPermission->id, $createPermission->id],
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('roles.index'));
+            ->assertRedirect($filteredIndex);
 
         $role->refresh();
 

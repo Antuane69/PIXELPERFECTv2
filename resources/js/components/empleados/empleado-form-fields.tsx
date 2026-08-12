@@ -2,10 +2,19 @@ import { DatePicker } from 'antd';
 import type { DatePickerProps } from 'antd';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
-import { Download, FileUp, ImagePlus } from 'lucide-react';
-import { Info } from 'lucide-react';
+import { Download, Info } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { FileAttachment } from '@/components/forms/file-attachment';
+import {
+    documentExtensions,
+    normalizeCurp,
+    normalizeDigits,
+    normalizeInput,
+    normalizeMoney,
+    normalizeRfc,
+} from '@/components/forms/form-utils';
+import { ImagePreview } from '@/components/forms/image-preview';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -67,6 +76,7 @@ type DateFieldProps = {
     error?: string;
     required?: boolean;
     disabledDate?: DatePickerProps['disabledDate'];
+    maxDate?: DatePickerProps['maxDate'];
     onChange: (value: string) => void;
 };
 
@@ -78,6 +88,7 @@ function DateField({
     error,
     required = false,
     disabledDate,
+    maxDate,
     onChange,
 }: DateFieldProps) {
     const dateValue = value ? dayjs(value) : null;
@@ -87,9 +98,11 @@ function DateField({
             <DatePicker
                 id={id}
                 value={dateValue?.isValid() ? dateValue : null}
+                defaultPickerValue={!dateValue ? maxDate : undefined}
                 format="DD/MM/YYYY"
                 placeholder="dd/mm/aaaa"
                 disabledDate={disabledDate}
+                maxDate={maxDate}
                 status={error ? 'error' : undefined}
                 className="!h-9 !w-full"
                 onChange={(date: Dayjs | null) =>
@@ -188,6 +201,7 @@ export function EmpleadoFormFields({
     tiposDocumento,
     errors,
 }: Props) {
+    const isCreating = empleado === null;
     const today = dayjs().format('YYYY-MM-DD');
     const [selectedPuestoId, setSelectedPuestoId] = useState(
         empleado?.puesto_id ? String(empleado.puesto_id) : '',
@@ -312,12 +326,20 @@ export function EmpleadoFormFields({
                     >
                         <Input
                             id="empleado-telefono"
+                            type="tel"
                             name="telefono"
-                            inputMode="tel"
+                            inputMode="numeric"
                             maxLength={10}
+                            pattern="[0-9]{10}"
+                            title="Ingresa un teléfono de 10 dígitos."
                             defaultValue={empleado?.telefono}
                             required
                             autoComplete="tel"
+                            onInput={(event) =>
+                                normalizeInput(event, (value) =>
+                                    normalizeDigits(value, 10),
+                                )
+                            }
                         />
                     </FormField>
                     <FormField
@@ -329,9 +351,16 @@ export function EmpleadoFormFields({
                             id="empleado-curp"
                             name="curp"
                             maxLength={18}
+                            pattern="[A-Z][AEIOUX][A-Z]{2}[0-9]{6}[HM][A-Z]{2}[BCDFGHJKLMNPQRSTVWXYZ]{3}[A-Z0-9][0-9]"
+                            title="Ingresa una CURP válida de 18 caracteres."
                             className="uppercase"
                             defaultValue={empleado?.curp}
                             required
+                            autoCapitalize="characters"
+                            spellCheck={false}
+                            onInput={(event) =>
+                                normalizeInput(event, normalizeCurp)
+                            }
                         />
                     </FormField>
                     <FormField id="empleado-rfc" label="RFC" error={errors.rfc}>
@@ -339,9 +368,16 @@ export function EmpleadoFormFields({
                             id="empleado-rfc"
                             name="rfc"
                             maxLength={13}
+                            pattern="[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}"
+                            title="Ingresa un RFC válido de 12 o 13 caracteres."
                             className="uppercase"
                             defaultValue={empleado?.rfc}
                             required
+                            autoCapitalize="characters"
+                            spellCheck={false}
+                            onInput={(event) =>
+                                normalizeInput(event, normalizeRfc)
+                            }
                         />
                     </FormField>
                     <FormField id="empleado-nss" label="NSS" error={errors.nss}>
@@ -350,7 +386,14 @@ export function EmpleadoFormFields({
                             name="nss"
                             inputMode="numeric"
                             maxLength={11}
+                            pattern="[0-9]{11}"
+                            title="Ingresa un NSS de 11 dígitos."
                             defaultValue={empleado?.nss ?? ''}
+                            onInput={(event) =>
+                                normalizeInput(event, (value) =>
+                                    normalizeDigits(value, 11),
+                                )
+                            }
                         />
                     </FormField>
                     <FormField
@@ -455,24 +498,30 @@ export function EmpleadoFormFields({
                         error={errors.avatar}
                         hint="JPG, PNG o WEBP. Máximo según configuración del servidor."
                     >
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                             {empleado?.avatar_url ? (
-                                <img
-                                    src={empleado.avatar_url}
-                                    alt="Avatar actual"
-                                    className="size-10 rounded-full border object-cover"
+                                <div className="size-12 shrink-0 overflow-hidden rounded-full border">
+                                    <ImagePreview
+                                        src={empleado.avatar_url}
+                                        active={Boolean(empleado.avatar_url)}
+                                    />
+                                </div>
+                            ) : null}
+                            <div className="min-w-0 flex-1">
+                                <FileAttachment
+                                    id="empleado-avatar"
+                                    name="avatar"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    acceptedFormats={[
+                                        'jpg',
+                                        'jpeg',
+                                        'png',
+                                        'webp',
+                                    ]}
+                                    maxSizeBytes={3 * 1024 * 1024}
+                                    showInputIcon={false}
                                 />
-                            ) : (
-                                <span className="flex size-10 items-center justify-center rounded-full bg-accent">
-                                    <ImagePlus className="size-4 text-muted-foreground" />
-                                </span>
-                            )}
-                            <Input
-                                id="empleado-avatar"
-                                type="file"
-                                name="avatar"
-                                accept="image/jpeg,image/png,image/webp"
-                            />
+                            </div>
                         </div>
                     </FormField>
                     <div className="sm:col-span-2 lg:col-span-3">
@@ -497,66 +546,104 @@ export function EmpleadoFormFields({
                 description="Información salarial y días acumulados."
             >
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {moneyFields.map(([field, label]) => (
-                        <FormField
-                            key={field}
-                            id={`empleado-${field}`}
-                            label={label}
-                            error={errors[field]}
-                        >
-                            {field === 'salario_dia' ||
-                            field === 'salario_quincena' ? (
-                                <Input
-                                    id={`empleado-${field}`}
-                                    type="number"
-                                    name={field}
-                                    min="0"
-                                    step="0.01"
-                                    value={
-                                        field === 'salario_dia'
-                                            ? salaryValues.salario_dia
-                                            : salaryValues.salario_quincena
-                                    }
-                                    onChange={(event) =>
-                                        setSalaryValues((current) => ({
-                                            ...current,
-                                            [field]: event.target.value,
-                                        }))
-                                    }
-                                />
-                            ) : (
-                                <Input
-                                    id={`empleado-${field}`}
-                                    type="number"
-                                    name={field}
-                                    min="0"
-                                    step="0.01"
-                                    defaultValue={empleado?.[field] ?? ''}
-                                />
-                            )}
-                        </FormField>
-                    ))}
-                    {dayFields.map(([field, label]) => (
-                        <FormField
-                            key={field}
-                            id={`empleado-${field}`}
-                            label={label}
-                            error={errors[field]}
-                        >
-                            <Input
+                    {moneyFields
+                        .filter(
+                            ([field]) =>
+                                !isCreating ||
+                                field === 'salario_dia' ||
+                                field === 'salario_quincena',
+                        )
+                        .map(([field, label]) => (
+                            <FormField
+                                key={field}
                                 id={`empleado-${field}`}
-                                type="number"
-                                name={field}
-                                min={field === 'dias_vacaciones' ? '2' : '0'}
-                                step="1"
-                                defaultValue={
-                                    field === 'dias_vacaciones'
-                                        ? (empleado?.dias_vacaciones ?? 2)
-                                        : (empleado?.dias_liquidacion ?? '')
-                                }
-                            />
-                        </FormField>
-                    ))}
+                                label={label}
+                                error={errors[field]}
+                            >
+                                {field === 'salario_dia' ||
+                                field === 'salario_quincena' ? (
+                                    <Input
+                                        id={`empleado-${field}`}
+                                        type="text"
+                                        inputMode="decimal"
+                                        name={field}
+                                        pattern="[0-9]+([.][0-9]{0,2})?"
+                                        title="Ingresa máximo 2 decimales."
+                                        value={
+                                            field === 'salario_dia'
+                                                ? salaryValues.salario_dia
+                                                : salaryValues.salario_quincena
+                                        }
+                                        onChange={(event) =>
+                                            setSalaryValues((current) => ({
+                                                ...current,
+                                                [field]: normalizeMoney(
+                                                    event.target.value,
+                                                ),
+                                            }))
+                                        }
+                                    />
+                                ) : (
+                                    <Input
+                                        id={`empleado-${field}`}
+                                        type="number"
+                                        name={field}
+                                        min="0"
+                                        step="0.01"
+                                        defaultValue={empleado?.[field] ?? ''}
+                                    />
+                                )}
+                            </FormField>
+                        ))}
+                    {dayFields
+                        .filter(
+                            ([field]) =>
+                                !isCreating || field === 'dias_vacaciones',
+                        )
+                        .map(([field, label]) => (
+                            <FormField
+                                key={field}
+                                id={`empleado-${field}`}
+                                label={label}
+                                error={errors[field]}
+                            >
+                                {isCreating && field === 'dias_vacaciones' ? (
+                                    <>
+                                        <Input
+                                            id={`empleado-${field}`}
+                                            type="number"
+                                            value="2"
+                                            disabled
+                                            readOnly
+                                        />
+                                        <input
+                                            type="hidden"
+                                            name="dias_vacaciones"
+                                            value="2"
+                                        />
+                                    </>
+                                ) : (
+                                    <Input
+                                        id={`empleado-${field}`}
+                                        type="number"
+                                        name={field}
+                                        min={
+                                            field === 'dias_vacaciones'
+                                                ? '2'
+                                                : '0'
+                                        }
+                                        step="1"
+                                        defaultValue={
+                                            field === 'dias_vacaciones'
+                                                ? (empleado?.dias_vacaciones ??
+                                                  2)
+                                                : (empleado?.dias_liquidacion ??
+                                                  '')
+                                        }
+                                    />
+                                )}
+                            </FormField>
+                        ))}
                     <fieldset className="grid gap-3 sm:col-span-2 lg:col-span-3">
                         <legend className="text-sm font-medium">
                             Días de descanso
@@ -592,7 +679,7 @@ export function EmpleadoFormFields({
                 title="Fechas laborales"
                 description="La fecha de ingreso activa el calendario contractual."
             >
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <DateField
                         id="empleado-fecha-nacimiento"
                         name="fecha_nacimiento"
@@ -600,9 +687,7 @@ export function EmpleadoFormFields({
                         value={dateValues.fecha_nacimiento}
                         error={errors.fecha_nacimiento}
                         required={!empleado}
-                        disabledDate={(date) =>
-                            date.isAfter(dayjs().subtract(16, 'year'), 'day')
-                        }
+                        maxDate={dayjs().subtract(16, 'year')}
                         onChange={(value) =>
                             updateDate('fecha_nacimiento', value)
                         }
@@ -696,8 +781,11 @@ export function EmpleadoFormFields({
                     <div className="grid gap-4 lg:grid-cols-2">
                         {visibleDocumentTypes.map((tipo) => {
                             const current = existingDocument(empleado, tipo.id);
-                            const accepted = tipo.documentos_aceptados
-                                .map((format) => `.${format.toLowerCase()}`)
+                            const acceptedExtensions = documentExtensions(
+                                tipo.documentos_aceptados,
+                            );
+                            const accepted = acceptedExtensions
+                                .map((format) => `.${format}`)
                                 .join(',');
 
                             return (
@@ -755,19 +843,13 @@ export function EmpleadoFormFields({
                                             'archivo',
                                         )}
                                     >
-                                        <div className="relative">
-                                            <FileUp className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                                            <Input
-                                                id={`documento-${tipo.id}`}
-                                                type="file"
-                                                name={`documentos[${tipo.id}][archivo]`}
-                                                accept={accepted}
-                                                required={
-                                                    tipo.activo && !current
-                                                }
-                                                className="pl-9"
-                                            />
-                                        </div>
+                                        <FileAttachment
+                                            id={`documento-${tipo.id}`}
+                                            name={`documentos[${tipo.id}][archivo]`}
+                                            accept={accepted}
+                                            acceptedFormats={acceptedExtensions}
+                                            required={tipo.activo && !current}
+                                        />
                                     </FormField>
                                     {tipo.es_renovable && (
                                         <DateField

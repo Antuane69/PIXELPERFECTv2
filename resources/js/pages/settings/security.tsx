@@ -6,6 +6,7 @@ import InputError from '@/components/input-error';
 import type { Props as ManageTwoFactorProps } from '@/components/manage-two-factor';
 import ManageTwoFactor from '@/components/manage-two-factor';
 import PasswordInput from '@/components/password-input';
+import PasswordStrengthInput from '@/components/password-strength-input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/security';
@@ -77,7 +78,7 @@ export default function Security(props: Props) {
                                     Nueva contraseña
                                 </Label>
 
-                                <PasswordInput
+                                <PasswordStrengthInput
                                     id="password"
                                     ref={passwordInput}
                                     name="password"

@@ -9,11 +9,21 @@ type ResourcePaginationProps = {
 
 function linkLabel(label: string) {
     if (label.includes('Previous') || label.includes('Anterior')) {
-        return <ChevronLeft className="size-4" />;
+        return (
+            <>
+                <ChevronLeft aria-hidden="true" className="size-4" />
+                <span className="sr-only">Página anterior</span>
+            </>
+        );
     }
 
     if (label.includes('Next') || label.includes('Siguiente')) {
-        return <ChevronRight className="size-4" />;
+        return (
+            <>
+                <ChevronRight aria-hidden="true" className="size-4" />
+                <span className="sr-only">Página siguiente</span>
+            </>
+        );
     }
 
     return label.replace(/&[^;]+;/g, '').trim();

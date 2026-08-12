@@ -213,6 +213,7 @@ export default function EmpleadosIndex({
                     formId="empleado-form"
                     form={editing ? update.form(editing.id) : store.form()}
                     resetOnSuccess={!editing}
+                    noValidate
                     submitLabel={
                         editing ? 'Actualizar empleado' : 'Crear empleado'
                     }

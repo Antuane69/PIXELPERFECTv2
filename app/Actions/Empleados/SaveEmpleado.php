@@ -5,6 +5,7 @@ namespace App\Actions\Empleados;
 use App\Models\Empleado;
 use App\Models\EmpleadoDocumento;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -153,15 +154,18 @@ class SaveEmpleado
 
     private function applyTrialContractDates(Empleado $empleado): void
     {
-        if ($empleado->fecha_ingreso === null || $empleado->periodo_prueba_meses === null) {
+        $fechaIngreso = $empleado->getAttribute('fecha_ingreso');
+        $periodoPruebaMeses = $empleado->getAttribute('periodo_prueba_meses');
+
+        if (! $fechaIngreso instanceof DateTimeInterface || ! is_int($periodoPruebaMeses)) {
             return;
         }
 
-        $fechaIngreso = CarbonImmutable::parse($empleado->fecha_ingreso->toDateString());
+        $fechaIngreso = CarbonImmutable::instance($fechaIngreso);
 
         $empleado->fecha_contrato_siguiente = $fechaIngreso->addMonthNoOverflow()->toDateString();
         $empleado->fecha_contrato_indefinido = $fechaIngreso
-            ->addMonthsNoOverflow((int) $empleado->periodo_prueba_meses)
+            ->addMonthsNoOverflow($periodoPruebaMeses)
             ->toDateString();
     }
 

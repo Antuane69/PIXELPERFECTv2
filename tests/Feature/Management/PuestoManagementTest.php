@@ -27,7 +27,22 @@ class PuestoManagementTest extends TestCase
 
     public function test_administrator_can_create_update_and_soft_delete_a_position(): void
     {
+        $filteredIndex = route('puestos.index', [
+            'search' => 'Desarrollador',
+            'activo' => true,
+            'per_page' => 25,
+            'page' => 2,
+        ]);
+        $sourceIndex = route('puestos.index', [
+            'search' => 'Desarrollador',
+            'activo' => true,
+            'per_page' => 25,
+            'page' => 2,
+            'return_to' => 'https://example.com',
+        ]);
+
         $this->actingAs($this->administrator)
+            ->from($sourceIndex)
             ->post(route('puestos.store'), [
                 'nombre' => 'Desarrollador',
                 'salario_dia' => '750.50',
@@ -35,11 +50,12 @@ class PuestoManagementTest extends TestCase
                 'activo' => true,
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('puestos.index'));
+            ->assertRedirect($filteredIndex);
 
         $puesto = Puesto::query()->where('nombre', 'Desarrollador')->firstOrFail();
 
         $this->actingAs($this->administrator)
+            ->from($sourceIndex)
             ->put(route('puestos.update', $puesto), [
                 'nombre' => 'Desarrollador Senior',
                 'salario_dia' => '900.00',
@@ -47,7 +63,7 @@ class PuestoManagementTest extends TestCase
                 'activo' => false,
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('puestos.index'));
+            ->assertRedirect($filteredIndex);
 
         $puesto->refresh();
 
@@ -57,9 +73,10 @@ class PuestoManagementTest extends TestCase
         $this->assertFalse($puesto->activo);
 
         $this->actingAs($this->administrator)
+            ->from($sourceIndex)
             ->delete(route('puestos.destroy', $puesto))
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('puestos.index'));
+            ->assertRedirect($filteredIndex);
 
         $this->assertSoftDeleted($puesto);
     }
@@ -117,6 +134,11 @@ class PuestoManagementTest extends TestCase
         Puesto::factory()->create(['nombre' => 'Puesto vigente']);
         $archivedPuesto = Puesto::factory()->create(['nombre' => 'Puesto archivado']);
         $archivedPuesto->delete();
+        $archivedIndex = route('puestos.index', [
+            'archivados' => true,
+            'search' => 'Puesto',
+            'page' => 2,
+        ]);
 
         $this->actingAs($this->administrator)
             ->get(route('puestos.index', ['archivados' => true]))
@@ -129,9 +151,10 @@ class PuestoManagementTest extends TestCase
             );
 
         $this->actingAs($this->administrator)
+            ->from($archivedIndex)
             ->patch(route('puestos.restore', $archivedPuesto))
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('puestos.index', ['archivados' => true]));
+            ->assertRedirect($archivedIndex);
 
         $this->assertNotSoftDeleted($archivedPuesto);
     }

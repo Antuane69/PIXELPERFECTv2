@@ -49,14 +49,17 @@ class AppServiceProvider extends ServiceProvider
             app()->isProduction(),
         );
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
-            ? Password::min(12)
+        Password::defaults(function (): Password {
+            $password = Password::min(12)
                 ->mixedCase()
                 ->letters()
                 ->numbers()
                 ->symbols()
-                ->uncompromised()
-            : null,
-        );
+                ->rules(['regex:/[\p{P}\p{S}]/u']);
+
+            return app()->isProduction()
+                ? $password->uncompromised()
+                : $password;
+        });
     }
 }

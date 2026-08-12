@@ -18,6 +18,8 @@ use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
+    private const INDEX_QUERY_PARAMETERS = ['search', 'per_page', 'page'];
+
     /**
      * Display a paginated role listing.
      */
@@ -87,7 +89,7 @@ class RoleController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Rol creado correctamente.']);
 
-        return to_route('roles.index');
+        return $this->redirectToResourceIndex($request, 'roles.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**
@@ -108,13 +110,13 @@ class RoleController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Rol actualizado correctamente.']);
 
-        return to_route('roles.index');
+        return $this->redirectToResourceIndex($request, 'roles.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     /**
      * Delete the specified role.
      */
-    public function destroy(Role $role): RedirectResponse
+    public function destroy(Request $request, Role $role): RedirectResponse
     {
         Gate::authorize('delete', $role);
         $this->ensureRoleIsMutable($role);
@@ -131,7 +133,7 @@ class RoleController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Rol eliminado correctamente.']);
 
-        return to_route('roles.index');
+        return $this->redirectToResourceIndex($request, 'roles.index', self::INDEX_QUERY_PARAMETERS);
     }
 
     private function ensureRoleIsMutable(Role $role): void

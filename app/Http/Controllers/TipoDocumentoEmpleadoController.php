@@ -15,6 +15,15 @@ use Inertia\Response;
 
 class TipoDocumentoEmpleadoController extends Controller
 {
+    private const INDEX_QUERY_PARAMETERS = [
+        'search',
+        'activo',
+        'es_renovable',
+        'archivados',
+        'per_page',
+        'page',
+    ];
+
     /**
      * Display a paginated employee document type listing.
      */
@@ -87,7 +96,11 @@ class TipoDocumentoEmpleadoController extends Controller
             'message' => 'Tipo de documento creado correctamente.',
         ]);
 
-        return to_route('tipos-documento-empleados.index');
+        return $this->redirectToResourceIndex(
+            $request,
+            'tipos-documento-empleados.index',
+            self::INDEX_QUERY_PARAMETERS,
+        );
     }
 
     /**
@@ -106,13 +119,17 @@ class TipoDocumentoEmpleadoController extends Controller
             'message' => 'Tipo de documento actualizado correctamente.',
         ]);
 
-        return to_route('tipos-documento-empleados.index');
+        return $this->redirectToResourceIndex(
+            $request,
+            'tipos-documento-empleados.index',
+            self::INDEX_QUERY_PARAMETERS,
+        );
     }
 
     /**
      * Soft delete the specified employee document type when it is unused.
      */
-    public function destroy(TipoDocumentoEmpleado $tipoDocumentoEmpleado): RedirectResponse
+    public function destroy(Request $request, TipoDocumentoEmpleado $tipoDocumentoEmpleado): RedirectResponse
     {
         Gate::authorize('delete', $tipoDocumentoEmpleado);
 
@@ -129,13 +146,17 @@ class TipoDocumentoEmpleadoController extends Controller
             'message' => 'Tipo de documento eliminado correctamente.',
         ]);
 
-        return to_route('tipos-documento-empleados.index');
+        return $this->redirectToResourceIndex(
+            $request,
+            'tipos-documento-empleados.index',
+            self::INDEX_QUERY_PARAMETERS,
+        );
     }
 
     /**
      * Restore the specified archived employee document type.
      */
-    public function restore(TipoDocumentoEmpleado $tipoDocumentoEmpleado): RedirectResponse
+    public function restore(Request $request, TipoDocumentoEmpleado $tipoDocumentoEmpleado): RedirectResponse
     {
         Gate::authorize('restore', $tipoDocumentoEmpleado);
 
@@ -146,7 +167,12 @@ class TipoDocumentoEmpleadoController extends Controller
             'message' => 'Tipo de documento restaurado correctamente.',
         ]);
 
-        return to_route('tipos-documento-empleados.index', ['archivados' => true]);
+        return $this->redirectToResourceIndex(
+            $request,
+            'tipos-documento-empleados.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['archivados' => true],
+        );
     }
 
     private function perPage(Request $request): int

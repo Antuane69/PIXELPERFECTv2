@@ -43,6 +43,7 @@ class EmpleadoManagementTest extends TestCase
             'activo' => true,
         ]);
         $payload = $this->validEmployeePayload($puesto);
+        $payload['periodo_prueba_meses'] = 5;
         $payload['avatar'] = UploadedFile::fake()->image('avatar-original.jpg', 200, 200);
         $payload['documentos'] = [[
             'tipo_documento_empleado_id' => $tipoDocumento->id,
@@ -53,11 +54,19 @@ class EmpleadoManagementTest extends TestCase
             ),
             'vence_el' => null,
         ]];
+        $filteredIndex = route('empleados.index', [
+            'search' => 'Empleado',
+            'puesto_id' => $puesto->id,
+            'estado_civil' => 'soltero',
+            'per_page' => 25,
+            'page' => 2,
+        ]);
 
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->post(route('empleados.store'), $payload)
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('empleados.index'));
+            ->assertRedirect($filteredIndex);
 
         $empleado = Empleado::query()->where('correo', 'empleado@gmail.com')->firstOrFail();
         $documento = $empleado->documentos()->firstOrFail();
@@ -65,18 +74,29 @@ class EmpleadoManagementTest extends TestCase
         $originalAvatarPath = $empleado->avatar;
 
         $this->assertSame('Empleado Inicial', $empleado->nombre);
-        $this->assertSame(3, $empleado->periodo_prueba_meses);
+        $this->assertSame(2, $empleado->dias_vacaciones);
+        $this->assertSame(5, $empleado->periodo_prueba_meses);
+        $this->assertNull($empleado->salario_vacaciones_finiquito);
+        $this->assertNull($empleado->aguinaldo);
+        $this->assertNull($empleado->prima_vacacional);
+        $this->assertNull($empleado->dias_liquidacion);
         $this->assertSame('2024-02-01', $empleado->fecha_contrato_siguiente->toDateString());
-        $this->assertSame('2024-04-01', $empleado->fecha_contrato_indefinido->toDateString());
+        $this->assertSame('2024-06-01', $empleado->fecha_contrato_indefinido->toDateString());
         $this->assertSame($tipoDocumento->id, $documento->tipo_documento_empleado_id);
         Storage::disk($documento->disco)->assertExists($documento->ruta);
         Storage::disk('local')->assertExists($originalAvatarPath);
 
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->post(route('empleados.update', $empleado), [
                 '_method' => 'PUT',
                 'nombre' => 'Empleado Actualizado',
                 'avatar' => UploadedFile::fake()->image('avatar-nuevo.png', 240, 240),
+                'salario_vacaciones_finiquito' => '1000.00',
+                'aguinaldo' => '2500.00',
+                'prima_vacacional' => '500.00',
+                'dias_vacaciones' => 12,
+                'dias_liquidacion' => 20,
                 'dias_descanso_present' => '1',
                 'documentos' => [[
                     'tipo_documento_empleado_id' => $tipoDocumento->id,
@@ -89,13 +109,18 @@ class EmpleadoManagementTest extends TestCase
                 ]],
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('empleados.index'));
+            ->assertRedirect($filteredIndex);
 
         $empleado->refresh();
         $documento->refresh();
 
         $this->assertSame('Empleado Actualizado', $empleado->nombre);
         $this->assertSame([], $empleado->dias_descanso);
+        $this->assertSame('1000.00', (string) $empleado->salario_vacaciones_finiquito);
+        $this->assertSame('2500.00', (string) $empleado->aguinaldo);
+        $this->assertSame('500.00', (string) $empleado->prima_vacacional);
+        $this->assertSame(12, $empleado->dias_vacaciones);
+        $this->assertSame(20, $empleado->dias_liquidacion);
         $this->assertSame('contrato-actualizado.pdf', $documento->nombre_original);
         Storage::disk('local')->assertMissing($originalDocumentPath);
         Storage::disk('local')->assertMissing($originalAvatarPath);
@@ -103,9 +128,10 @@ class EmpleadoManagementTest extends TestCase
         Storage::disk('local')->assertExists($empleado->avatar);
 
         $this->actingAs($this->administrator)
+            ->from($filteredIndex)
             ->delete(route('empleados.destroy', $empleado))
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('empleados.index'));
+            ->assertRedirect($filteredIndex);
 
         $this->assertSoftDeleted($empleado);
     }
@@ -122,7 +148,9 @@ class EmpleadoManagementTest extends TestCase
         $payload = $this->validEmployeePayload($puesto);
         $payload['correo'] = 'not-an-email';
         $payload['curp'] = 'invalid';
-        $payload['telefono'] = '123';
+        $payload['rfc'] = 'invalid';
+        $payload['nss'] = '12345ABC';
+        $payload['telefono'] = '123ABC';
         $payload['fecha_nacimiento'] = now()->subYears(10)->toDateString();
 
         $this->actingAs($this->administrator)
@@ -130,6 +158,8 @@ class EmpleadoManagementTest extends TestCase
             ->assertSessionHasErrors([
                 'correo',
                 'curp',
+                'rfc',
+                'nss',
                 'telefono',
                 'fecha_nacimiento',
                 'documentos',
@@ -138,16 +168,29 @@ class EmpleadoManagementTest extends TestCase
         $this->assertDatabaseCount('empleados', 0);
     }
 
-    public function test_employee_validation_rejects_less_than_two_vacation_days_and_more_than_six_trial_months(): void
+    public function test_employee_validation_rejects_more_than_six_trial_months(): void
     {
         $puesto = Puesto::factory()->create();
         $payload = $this->validEmployeePayload($puesto);
-        $payload['dias_vacaciones'] = 1;
         $payload['periodo_prueba_meses'] = 7;
 
         $this->actingAs($this->administrator)
             ->post(route('empleados.store'), $payload)
-            ->assertSessionHasErrors(['dias_vacaciones', 'periodo_prueba_meses']);
+            ->assertSessionHasErrors(['periodo_prueba_meses']);
+
+        $this->assertDatabaseCount('empleados', 0);
+    }
+
+    public function test_employee_validation_rejects_salary_values_with_more_than_two_decimals(): void
+    {
+        $puesto = Puesto::factory()->create();
+        $payload = $this->validEmployeePayload($puesto);
+        $payload['salario_dia'] = '10.123';
+        $payload['salario_quincena'] = '100.999';
+
+        $this->actingAs($this->administrator)
+            ->post(route('empleados.store'), $payload)
+            ->assertSessionHasErrors(['salario_dia', 'salario_quincena']);
 
         $this->assertDatabaseCount('empleados', 0);
     }
@@ -329,6 +372,11 @@ class EmpleadoManagementTest extends TestCase
         $empleado = Empleado::factory()->create(['puesto_id' => $puesto->id]);
         $empleado->delete();
         $puesto->delete();
+        $archivedIndex = route('empleados.index', [
+            'archivados' => true,
+            'search' => $empleado->nombre,
+            'page' => 2,
+        ]);
 
         $this->actingAs($this->administrator)
             ->get(route('empleados.index', ['archivados' => true]))
@@ -353,9 +401,10 @@ class EmpleadoManagementTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->actingAs($this->administrator)
+            ->from($archivedIndex)
             ->patch(route('empleados.restore', $empleado))
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('empleados.index', ['archivados' => true]));
+            ->assertRedirect($archivedIndex);
 
         $this->assertNotSoftDeleted($empleado);
     }
