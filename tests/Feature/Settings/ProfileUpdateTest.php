@@ -6,7 +6,9 @@ use App\Jobs\SendEmailVerificationEmail;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class ProfileUpdateTest extends TestCase
@@ -71,6 +73,58 @@ class ProfileUpdateTest extends TestCase
 
         $this->assertNotNull($user->refresh()->email_verified_at);
         Queue::assertNothingPushed();
+    }
+
+    public function test_profile_avatar_can_be_updated_and_is_shared_as_a_data_uri(): void
+    {
+        $user = User::factory()->create();
+        $avatar = UploadedFile::fake()->image('avatar.png', 120, 120);
+        $avatarContents = file_get_contents($avatar->getPathname());
+
+        $response = $this
+            ->actingAs($user)
+            ->patch(route('profile.update'), [
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar' => $avatar,
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('profile.edit'));
+
+        $user->refresh();
+
+        $this->assertSame($avatarContents, $user->avatar);
+        $this->assertSame('image/png', $user->avatar_mime_type);
+
+        $this->actingAs($user)
+            ->get(route('profile.edit'))
+            ->assertInertia(
+                fn (Assert $page): Assert => $page->where(
+                    'auth.user.avatar',
+                    'data:image/png;base64,'.base64_encode($avatarContents),
+                ),
+            );
+    }
+
+    public function test_profile_avatar_must_be_a_supported_image(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->from(route('profile.edit'))
+            ->patch(route('profile.update'), [
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar' => UploadedFile::fake()->create(
+                    'avatar.txt',
+                    10,
+                    'text/plain',
+                ),
+            ])
+            ->assertSessionHasErrors('avatar')
+            ->assertRedirect(route('profile.edit'));
     }
 
     public function test_user_can_delete_their_account()

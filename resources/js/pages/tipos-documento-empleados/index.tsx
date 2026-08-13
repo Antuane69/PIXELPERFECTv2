@@ -8,19 +8,19 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/TipoDocumentoEmpleadoController';
-import { ArchivedRecordsToggle } from '@/components/archived-records-toggle';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
+import { FiltrosBase } from '@/components/filtros-base';
+import type { FilterFacet } from '@/components/filtros-base';
 import InputError from '@/components/input-error';
+import { ResourceExportDialog } from '@/components/resource-export-dialog';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
 import { ResourceHeader } from '@/components/resource-header';
 import { ResourcePagination } from '@/components/resource-pagination';
-import { ResourceSearch } from '@/components/resource-search';
 import { ResourceTable } from '@/components/resource-table';
 import type { ResourceColumn } from '@/components/resource-table';
 import { RestoreButton } from '@/components/restore-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,7 +36,13 @@ import type { LaravelPaginator, TipoDocumentoEmpleado } from '@/types';
 
 type Props = {
     tiposDocumento: LaravelPaginator<TipoDocumentoEmpleado>;
-    filters?: { search?: string; archivados?: boolean };
+    filters?: {
+        search?: string;
+        activo?: boolean | null;
+        esRenovable?: boolean | null;
+        archivados?: boolean;
+        perPage?: number;
+    };
 };
 
 const formats = [
@@ -68,6 +74,33 @@ export default function TiposDocumentoIndex({
         null,
     );
     const showingArchived = filters?.archivados ?? false;
+    const filterFacets: FilterFacet[] = [
+        {
+            key: 'activo',
+            label: 'Estado',
+            options: [
+                { value: true, label: 'Activo' },
+                { value: false, label: 'Inactivo' },
+            ],
+        },
+        {
+            key: 'es_renovable',
+            label: 'Renovación',
+            options: [
+                { value: true, label: 'Renovable' },
+                { value: false, label: 'No renovable' },
+            ],
+        },
+        {
+            key: 'archivados',
+            label: 'Tipo de registro',
+            defaultValue: false,
+            options: [
+                { value: false, label: 'Vigentes' },
+                { value: true, label: 'Archivados' },
+            ],
+        },
+    ];
 
     const columns: ResourceColumn<TipoDocumentoEmpleado>[] = [
         {
@@ -167,17 +200,14 @@ export default function TiposDocumentoIndex({
                     description="Configura los documentos requeridos para los expedientes."
                     actions={
                         <div className="flex flex-wrap gap-2">
-                            <ArchivedRecordsToggle
-                                route={
-                                    showingArchived
-                                        ? index()
-                                        : index({
-                                              query: { archivados: true },
-                                          })
-                                }
-                                showingArchived={showingArchived}
-                                activeLabel="Ver vigentes"
-                                archivedLabel="Ver archivados"
+                            <ResourceExportDialog
+                                report="tipos-documento-empleados"
+                                filters={{
+                                    search: filters?.search,
+                                    activo: filters?.activo,
+                                    es_renovable: filters?.esRenovable,
+                                    archivados: showingArchived,
+                                }}
                             />
                             {!showingArchived &&
                                 can('tipos_documento.create') && (
@@ -193,16 +223,18 @@ export default function TiposDocumentoIndex({
                         </div>
                     }
                 />
-                <Card className="py-4">
-                    <CardContent>
-                        <ResourceSearch
-                            route={index()}
-                            defaultValue={filters?.search}
-                            placeholder="Buscar tipo de documento"
-                            query={showingArchived ? { archivados: true } : {}}
-                        />
-                    </CardContent>
-                </Card>
+                <FiltrosBase
+                    route={index()}
+                    defaultSearch={filters?.search}
+                    placeholder="Buscar tipo de documento"
+                    facets={filterFacets}
+                    query={{
+                        activo: filters?.activo,
+                        es_renovable: filters?.esRenovable,
+                        archivados: showingArchived,
+                        per_page: filters?.perPage ?? 15,
+                    }}
+                />
                 <ResourceTable
                     data={tiposDocumento.data}
                     columns={columns}

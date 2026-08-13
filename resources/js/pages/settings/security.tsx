@@ -1,7 +1,6 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, setLayoutProps } from '@inertiajs/react';
 import { useRef } from 'react';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
-import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import type { Props as ManageTwoFactorProps } from '@/components/manage-two-factor';
 import ManageTwoFactor from '@/components/manage-two-factor';
@@ -10,6 +9,7 @@ import PasswordStrengthInput from '@/components/password-strength-input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/security';
+import type { AppLayoutProps } from '@/types';
 
 type Props = {
     passwordRules: string;
@@ -19,6 +19,12 @@ export default function Security(props: Props) {
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
 
+    setLayoutProps<AppLayoutProps>({
+        headerDescription:
+            'Usa una contraseña larga y única para mantener tu cuenta segura',
+        headerActions: undefined,
+    });
+
     return (
         <>
             <Head title="Configuración de seguridad" />
@@ -26,12 +32,6 @@ export default function Security(props: Props) {
             <h1 className="sr-only">Configuración de seguridad</h1>
 
             <div className="space-y-6">
-                <Heading
-                    variant="small"
-                    title="Actualizar contraseña"
-                    description="Usa una contraseña larga y única para mantener tu cuenta segura"
-                />
-
                 <Form
                     {...SecurityController.update.form()}
                     options={{

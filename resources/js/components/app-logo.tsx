@@ -2,18 +2,14 @@ import AppLogoIcon from '@/components/app-logo-icon';
 
 export default function AppLogo() {
     return (
-        <>
-            <div className="flex aspect-square size-9 items-center justify-center overflow-hidden rounded-lg bg-primary/10 ring-1 ring-primary/15">
-                <AppLogoIcon className="size-8 object-contain" />
-            </div>
-            <div className="ml-1 grid min-w-0 flex-1 text-left text-sm">
-                <span className="truncate leading-tight font-semibold">
-                    Pixel Perfect
+        <div className="group/logo flex min-w-0 flex-1 items-center gap-3 group-data-[collapsible=icon]:justify-center">
+            <AppLogoIcon className="size-9 shrink-0 object-contain transition-[width,height,transform] duration-300 ease-in-out group-hover/logo:scale-105 group-data-[collapsible=icon]:size-16 motion-reduce:transition-none" />
+            <span className="flex min-w-0 items-baseline text-base leading-none tracking-[-0.08em] group-data-[collapsible=icon]:hidden">
+                <span className="font-black">PIXEL</span>
+                <span className="font-serif font-semibold text-[#a855f7] italic dark:text-[#d8b4fe]">
+                    PERFECT
                 </span>
-                <span className="truncate text-xs leading-tight text-muted-foreground">
-                    Administración
-                </span>
-            </div>
-        </>
+            </span>
+        </div>
     );
 }

@@ -8,16 +8,16 @@ import {
     update,
 } from '@/actions/App/Http/Controllers/RoleController';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
+import { FiltrosBase } from '@/components/filtros-base';
 import InputError from '@/components/input-error';
+import { ResourceExportDialog } from '@/components/resource-export-dialog';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
 import { ResourceHeader } from '@/components/resource-header';
 import { ResourcePagination } from '@/components/resource-pagination';
-import { ResourceSearch } from '@/components/resource-search';
 import { ResourceTable } from '@/components/resource-table';
 import type { ResourceColumn } from '@/components/resource-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,7 +27,7 @@ import type { LaravelPaginator, Permission, Role } from '@/types';
 type Props = {
     roles: LaravelPaginator<Role>;
     permissions: Permission[];
-    filters?: { search?: string };
+    filters?: { search?: string; perPage?: number };
 };
 
 const permissionName = (permission: Permission | string) =>
@@ -132,27 +132,30 @@ export default function RolesIndex({ roles, permissions, filters }: Props) {
                     title="Roles"
                     description="Agrupa permisos y define el nivel de acceso de los usuarios."
                     actions={
-                        can('roles.create') ? (
-                            <Button
-                                onClick={() => {
-                                    setEditing(null);
-                                    setDialogOpen(true);
-                                }}
-                            >
-                                <Plus /> Nuevo rol
-                            </Button>
-                        ) : undefined
+                        <div className="flex flex-wrap gap-2">
+                            <ResourceExportDialog
+                                report="roles"
+                                filters={{ search: filters?.search }}
+                            />
+                            {can('roles.create') && (
+                                <Button
+                                    onClick={() => {
+                                        setEditing(null);
+                                        setDialogOpen(true);
+                                    }}
+                                >
+                                    <Plus /> Nuevo rol
+                                </Button>
+                            )}
+                        </div>
                     }
                 />
-                <Card className="py-4">
-                    <CardContent>
-                        <ResourceSearch
-                            route={index()}
-                            defaultValue={filters?.search}
-                            placeholder="Buscar rol"
-                        />
-                    </CardContent>
-                </Card>
+                <FiltrosBase
+                    route={index()}
+                    defaultSearch={filters?.search}
+                    placeholder="Buscar rol"
+                    query={{ per_page: filters?.perPage ?? 15 }}
+                />
                 <ResourceTable
                     data={roles.data}
                     columns={columns}

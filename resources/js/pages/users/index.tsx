@@ -8,18 +8,18 @@ import {
     update,
 } from '@/actions/App/Http/Controllers/UserController';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
+import { FiltrosBase } from '@/components/filtros-base';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import PasswordStrengthInput from '@/components/password-strength-input';
+import { ResourceExportDialog } from '@/components/resource-export-dialog';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
 import { ResourceHeader } from '@/components/resource-header';
 import { ResourcePagination } from '@/components/resource-pagination';
-import { ResourceSearch } from '@/components/resource-search';
 import { ResourceTable } from '@/components/resource-table';
 import type { ResourceColumn } from '@/components/resource-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +29,7 @@ import type { LaravelPaginator, ManagedUser, Role } from '@/types';
 type Props = {
     users: LaravelPaginator<ManagedUser>;
     roles: Role[];
-    filters?: { search?: string };
+    filters?: { search?: string; perPage?: number };
     passwordRules: string;
 };
 
@@ -153,22 +153,25 @@ export default function UsersIndex({
                     title="Usuarios"
                     description="Administra las cuentas, credenciales y roles de acceso."
                     actions={
-                        can('users.create') && canAssignRoles ? (
-                            <Button onClick={openCreate}>
-                                <Plus /> Nuevo usuario
-                            </Button>
-                        ) : undefined
+                        <div className="flex flex-wrap gap-2">
+                            <ResourceExportDialog
+                                report="usuarios"
+                                filters={{ search: filters?.search }}
+                            />
+                            {can('users.create') && canAssignRoles && (
+                                <Button onClick={openCreate}>
+                                    <Plus /> Nuevo usuario
+                                </Button>
+                            )}
+                        </div>
                     }
                 />
-                <Card className="py-4">
-                    <CardContent>
-                        <ResourceSearch
-                            route={index()}
-                            defaultValue={filters?.search}
-                            placeholder="Buscar por nombre o correo"
-                        />
-                    </CardContent>
-                </Card>
+                <FiltrosBase
+                    route={index()}
+                    defaultSearch={filters?.search}
+                    placeholder="Buscar por nombre o correo"
+                    query={{ per_page: filters?.perPage ?? 15 }}
+                />
                 <ResourceTable
                     data={users.data}
                     columns={columns}

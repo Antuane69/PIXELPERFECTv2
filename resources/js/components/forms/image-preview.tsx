@@ -1,5 +1,11 @@
 import { Image as AntImage } from 'antd';
+import { Search } from 'lucide-react';
 import { useState } from 'react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 type ImagePreviewProps = {
     src: string;
@@ -21,7 +27,19 @@ export function ImagePreview({ src, active }: ImagePreviewProps) {
             height={48}
             className="size-12 shrink-0 rounded-md object-cover"
             preview={{
-                cover: 'Ver imagen',
+                cover: (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span
+                                className="flex size-full items-center justify-center"
+                                aria-label="Ver imagen"
+                            >
+                                <Search className="size-5" aria-hidden="true" />
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver imagen</TooltipContent>
+                    </Tooltip>
+                ),
                 mask: { closable: true },
                 open,
                 onOpenChange: setOpen,

@@ -3,6 +3,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DownloadEmpleadoDocumentoController;
 use App\Http\Controllers\EmpleadoController;
+use App\Http\Controllers\ExportController;
 use App\Http\Controllers\PuestoController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ShowEmpleadoAvatarController;
@@ -23,6 +24,9 @@ Route::get('/', static function (): Response|RedirectResponse {
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    Route::post('reportes/{reporte}/exportar', [ExportController::class, 'exportar'])
+        ->name('reportes.exportar');
 
     Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('roles', RoleController::class)->only(['index', 'store', 'update', 'destroy']);

@@ -62,6 +62,7 @@ class HandleInertiaRequests extends Middleware
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'avatar' => $this->avatarDataUri($user),
             'email_verified_at' => $user->email_verified_at?->toISOString(),
             'roles' => $user->getRoleNames()->sort()->values()->all(),
             'permissions' => $user->getAllPermissions()
@@ -72,5 +73,14 @@ class HandleInertiaRequests extends Middleware
             'created_at' => $user->created_at?->toISOString(),
             'updated_at' => $user->updated_at?->toISOString(),
         ];
+    }
+
+    private function avatarDataUri(User $user): ?string
+    {
+        if ($user->avatar === null || $user->avatar_mime_type === null) {
+            return null;
+        }
+
+        return "data:{$user->avatar_mime_type};base64,".base64_encode($user->avatar);
     }
 }

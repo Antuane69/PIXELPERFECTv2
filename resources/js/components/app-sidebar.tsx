@@ -19,10 +19,14 @@ export function AppSidebar() {
 
     return (
         <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
+            <SidebarHeader className="group-data-[collapsible=icon]/sidebar-wrapper:p-0">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
+                        <SidebarMenuButton
+                            size="lg"
+                            asChild
+                            className="transition-[width,height,padding,background-color] duration-300 ease-in-out group-data-[collapsible=icon]:h-16! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center! group-data-[collapsible=icon]:overflow-visible! group-data-[collapsible=icon]:rounded-none! group-data-[collapsible=icon]:p-0! hover:bg-transparent! hover:text-sidebar-foreground! motion-reduce:transition-none"
+                        >
                             <Link href={mainNavItems[0].href} prefetch>
                                 <AppLogo />
                             </Link>

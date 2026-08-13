@@ -1,15 +1,17 @@
-import { Form, Head, usePage } from '@inertiajs/react';
-import { Link } from '@inertiajs/react';
+import { Form, Head, Link, setLayoutProps, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
-import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useInitials } from '@/hooks/use-initials';
 import { edit } from '@/routes/profile';
 import { send } from '@/routes/verification';
-import type { Auth } from '@/types';
+import type { AppLayoutProps, Auth } from '@/types';
 
 type PageProps = {
     auth: Auth;
@@ -24,10 +26,37 @@ export default function Profile({
 }) {
     const { auth } = usePage<PageProps>().props;
     const user = auth.user;
+    const getInitials = useInitials();
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(
+        user?.avatar ?? null,
+    );
+
+    useEffect(() => {
+        return () => {
+            if (avatarPreview?.startsWith('blob:')) {
+                URL.revokeObjectURL(avatarPreview);
+            }
+        };
+    }, [avatarPreview]);
 
     if (!user) {
         return null;
     }
+
+    setLayoutProps<AppLayoutProps>({
+        headerDescription: 'Actualiza tu nombre, correo electrónico y avatar',
+        headerActions: undefined,
+    });
+
+    const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        setAvatarPreview(URL.createObjectURL(file));
+    };
 
     return (
         <>
@@ -36,14 +65,9 @@ export default function Profile({
             <h1 className="sr-only">Configuración del perfil</h1>
 
             <div className="space-y-6">
-                <Heading
-                    variant="small"
-                    title="Perfil"
-                    description="Actualiza tu nombre y correo electrónico"
-                />
-
                 <Form
                     {...ProfileController.update.form()}
+                    id="profile-form"
                     options={{
                         preserveScroll: true,
                     }}
@@ -51,6 +75,34 @@ export default function Profile({
                 >
                     {({ processing, errors }) => (
                         <>
+                            <div className="grid gap-3">
+                                <Label htmlFor="avatar">Avatar</Label>
+                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                                    <Avatar className="size-20 rounded-2xl">
+                                        <AvatarImage
+                                            src={avatarPreview ?? undefined}
+                                            alt={'Avatar de ' + user.name}
+                                        />
+                                        <AvatarFallback className="rounded-2xl bg-primary/10 text-xl font-semibold text-primary">
+                                            {getInitials(user.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="grid gap-2">
+                                        <Input
+                                            id="avatar"
+                                            name="avatar"
+                                            type="file"
+                                            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                                            onChange={handleAvatarChange}
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            JPG, PNG o WEBP. Máximo 2 MB.
+                                        </p>
+                                    </div>
+                                </div>
+                                <InputError message={errors.avatar} />
+                            </div>
+
                             <div className="grid gap-2">
                                 <Label htmlFor="name">Nombre</Label>
 

@@ -57,7 +57,7 @@ type FormFieldProps = {
 
 function FormField({ id, label, error, hint, children }: FormFieldProps) {
     return (
-        <div className="grid gap-2">
+        <div className="grid gap-2 self-start">
             <Label htmlFor={id}>{label}</Label>
             {children}
             {hint ? (

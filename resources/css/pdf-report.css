@@ -1,0 +1,135 @@
+@page {
+    margin: 34px 34px 68px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    color: #271b2c;
+    font-family: 'DejaVu Sans', sans-serif;
+    font-size: 8px;
+}
+
+.report-header {
+    border-bottom: 2px solid #935aac;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+}
+
+.report-header-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.report-header-table td {
+    border: 0;
+    padding: 0;
+    vertical-align: middle;
+}
+
+.report-brand img {
+    max-height: 40px;
+    max-width: 190px;
+}
+
+.report-meta {
+    color: #6f5978;
+    text-align: right;
+}
+
+.report-meta span {
+    display: block;
+    margin-bottom: 3px;
+}
+
+h1 {
+    color: #935aac;
+    font-size: 15px;
+    margin: 0 0 4px;
+}
+
+.report-subtitle {
+    color: #6f5978;
+    margin: 0 0 10px;
+}
+
+.data-table {
+    border: 1px solid #e6d8ec;
+    border-collapse: separate;
+    border-radius: 10px;
+    border-spacing: 0;
+    page-break-inside: auto;
+    width: 100%;
+}
+
+.data-table.fixed-layout {
+    table-layout: fixed;
+}
+
+.data-table thead {
+    display: table-header-group;
+}
+
+.data-table tr {
+    page-break-inside: avoid;
+}
+
+.data-table th {
+    background: #935aac;
+    border: 0;
+    border-bottom: 2px solid #7e4896;
+    color: #ffffff;
+    font-size: 8px;
+    padding: 7px 6px;
+    text-align: left;
+}
+
+.data-table th + th {
+    border-left: 1px solid #ae79c3;
+}
+
+.data-table thead tr:first-child th:first-child {
+    border-top-left-radius: 9px;
+}
+
+.data-table thead tr:first-child th:last-child {
+    border-top-right-radius: 9px;
+}
+
+.data-table td {
+    background: #fcf9fe;
+    border: 0;
+    border-bottom: 1px solid #e6d8ec;
+    overflow-wrap: break-word;
+    padding: 6px;
+    vertical-align: top;
+    word-wrap: break-word;
+}
+
+.data-table td + td {
+    border-left: 1px solid #e6d8ec;
+}
+
+.data-table tbody tr:nth-child(even) td {
+    background: #f7eefa;
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.data-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 9px;
+}
+
+.data-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 9px;
+}
+
+.empty-cell {
+    color: #6f5978;
+    padding: 18px;
+    text-align: center;
+}

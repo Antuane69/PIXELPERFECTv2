@@ -8,19 +8,19 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/EmpleadoController';
-import { ArchivedRecordsToggle } from '@/components/archived-records-toggle';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { EmpleadoFormFields } from '@/components/empleados/empleado-form-fields';
+import { FiltrosBase } from '@/components/filtros-base';
+import type { FilterFacet } from '@/components/filtros-base';
+import { ResourceExportDialog } from '@/components/resource-export-dialog';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
 import { ResourceHeader } from '@/components/resource-header';
 import { ResourcePagination } from '@/components/resource-pagination';
-import { ResourceSearch } from '@/components/resource-search';
 import { ResourceTable } from '@/components/resource-table';
 import type { ResourceColumn } from '@/components/resource-table';
 import { RestoreButton } from '@/components/restore-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { usePermissions } from '@/hooks/use-permissions';
 import type {
     Empleado,
@@ -33,7 +33,13 @@ type Props = {
     empleados: LaravelPaginator<Empleado>;
     puestos: Puesto[];
     tiposDocumento: TipoDocumentoEmpleado[];
-    filters?: { search?: string; archivados?: boolean };
+    filters?: {
+        search?: string;
+        puestoId?: number | null;
+        estadoCivil?: string | null;
+        archivados?: boolean;
+        perPage?: number;
+    };
 };
 
 export default function EmpleadosIndex({
@@ -47,6 +53,37 @@ export default function EmpleadosIndex({
     const [editing, setEditing] = useState<Empleado | null>(null);
     const [deleting, setDeleting] = useState<Empleado | null>(null);
     const showingArchived = filters?.archivados ?? false;
+    const filterFacets: FilterFacet[] = [
+        {
+            key: 'puesto_id',
+            label: 'Puesto',
+            layout: 'list',
+            options: puestos.map((puesto) => ({
+                value: puesto.id,
+                label: puesto.nombre,
+            })),
+        },
+        {
+            key: 'estado_civil',
+            label: 'Estado civil',
+            options: [
+                { value: 'soltero', label: 'Soltero(a)' },
+                { value: 'casado', label: 'Casado(a)' },
+                { value: 'divorciado', label: 'Divorciado(a)' },
+                { value: 'union_libre', label: 'Unión libre' },
+                { value: 'viudo', label: 'Viudo(a)' },
+            ],
+        },
+        {
+            key: 'archivados',
+            label: 'Tipo de registro',
+            defaultValue: false,
+            options: [
+                { value: false, label: 'Vigentes' },
+                { value: true, label: 'Archivados' },
+            ],
+        },
+    ];
 
     const columns: ResourceColumn<Empleado>[] = [
         {
@@ -156,17 +193,14 @@ export default function EmpleadosIndex({
                     description="Gestiona datos laborales, documentos y vigencias del personal."
                     actions={
                         <div className="flex flex-wrap gap-2">
-                            <ArchivedRecordsToggle
-                                route={
-                                    showingArchived
-                                        ? index()
-                                        : index({
-                                              query: { archivados: true },
-                                          })
-                                }
-                                showingArchived={showingArchived}
-                                activeLabel="Ver vigentes"
-                                archivedLabel="Ver archivados"
+                            <ResourceExportDialog
+                                report="empleados"
+                                filters={{
+                                    search: filters?.search,
+                                    puesto_id: filters?.puestoId,
+                                    estado_civil: filters?.estadoCivil,
+                                    archivados: showingArchived,
+                                }}
                             />
                             {!showingArchived && can('empleados.create') && (
                                 <Button
@@ -181,16 +215,18 @@ export default function EmpleadosIndex({
                         </div>
                     }
                 />
-                <Card className="py-4">
-                    <CardContent>
-                        <ResourceSearch
-                            route={index()}
-                            defaultValue={filters?.search}
-                            placeholder="Buscar por nombre, correo, CURP o RFC"
-                            query={showingArchived ? { archivados: true } : {}}
-                        />
-                    </CardContent>
-                </Card>
+                <FiltrosBase
+                    route={index()}
+                    defaultSearch={filters?.search}
+                    placeholder="Buscar por nombre, correo, CURP o RFC"
+                    facets={filterFacets}
+                    query={{
+                        puesto_id: filters?.puestoId,
+                        estado_civil: filters?.estadoCivil,
+                        archivados: showingArchived,
+                        per_page: filters?.perPage ?? 15,
+                    }}
+                />
                 <ResourceTable
                     data={empleados.data}
                     columns={columns}

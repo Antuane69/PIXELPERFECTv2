@@ -8,19 +8,19 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/PuestoController';
-import { ArchivedRecordsToggle } from '@/components/archived-records-toggle';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
+import { FiltrosBase } from '@/components/filtros-base';
+import type { FilterFacet } from '@/components/filtros-base';
 import InputError from '@/components/input-error';
+import { ResourceExportDialog } from '@/components/resource-export-dialog';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
 import { ResourceHeader } from '@/components/resource-header';
 import { ResourcePagination } from '@/components/resource-pagination';
-import { ResourceSearch } from '@/components/resource-search';
 import { ResourceTable } from '@/components/resource-table';
 import type { ResourceColumn } from '@/components/resource-table';
 import { RestoreButton } from '@/components/restore-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +29,12 @@ import type { LaravelPaginator, Puesto } from '@/types';
 
 type Props = {
     puestos: LaravelPaginator<Puesto>;
-    filters?: { search?: string; archivados?: boolean };
+    filters?: {
+        search?: string;
+        activo?: boolean | null;
+        archivados?: boolean;
+        perPage?: number;
+    };
 };
 
 const money = new Intl.NumberFormat('es-MX', {
@@ -43,6 +48,25 @@ export default function PuestosIndex({ puestos, filters }: Props) {
     const [editing, setEditing] = useState<Puesto | null>(null);
     const [deleting, setDeleting] = useState<Puesto | null>(null);
     const showingArchived = filters?.archivados ?? false;
+    const filterFacets: FilterFacet[] = [
+        {
+            key: 'activo',
+            label: 'Estado del puesto',
+            options: [
+                { value: true, label: 'Activo' },
+                { value: false, label: 'Inactivo' },
+            ],
+        },
+        {
+            key: 'archivados',
+            label: 'Tipo de registro',
+            defaultValue: false,
+            options: [
+                { value: false, label: 'Vigentes' },
+                { value: true, label: 'Archivados' },
+            ],
+        },
+    ];
 
     const columns: ResourceColumn<Puesto>[] = [
         {
@@ -134,17 +158,13 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                     description="Mantén actualizado el catálogo salarial y de puestos."
                     actions={
                         <div className="flex flex-wrap gap-2">
-                            <ArchivedRecordsToggle
-                                route={
-                                    showingArchived
-                                        ? index()
-                                        : index({
-                                              query: { archivados: true },
-                                          })
-                                }
-                                showingArchived={showingArchived}
-                                activeLabel="Ver vigentes"
-                                archivedLabel="Ver archivados"
+                            <ResourceExportDialog
+                                report="puestos"
+                                filters={{
+                                    search: filters?.search,
+                                    activo: filters?.activo,
+                                    archivados: showingArchived,
+                                }}
                             />
                             {!showingArchived && can('puestos.create') && (
                                 <Button
@@ -159,16 +179,17 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                         </div>
                     }
                 />
-                <Card className="py-4">
-                    <CardContent>
-                        <ResourceSearch
-                            route={index()}
-                            defaultValue={filters?.search}
-                            placeholder="Buscar puesto"
-                            query={showingArchived ? { archivados: true } : {}}
-                        />
-                    </CardContent>
-                </Card>
+                <FiltrosBase
+                    route={index()}
+                    defaultSearch={filters?.search}
+                    placeholder="Buscar puesto"
+                    facets={filterFacets}
+                    query={{
+                        activo: filters?.activo,
+                        archivados: showingArchived,
+                        per_page: filters?.perPage ?? 15,
+                    }}
+                />
                 <ResourceTable
                     data={puestos.data}
                     columns={columns}

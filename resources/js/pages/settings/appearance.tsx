@@ -1,9 +1,14 @@
-import { Head } from '@inertiajs/react';
+import { Head, setLayoutProps } from '@inertiajs/react';
 import AppearanceTabs from '@/components/appearance-tabs';
-import Heading from '@/components/heading';
 import { edit as editAppearance } from '@/routes/appearance';
+import type { AppLayoutProps } from '@/types';
 
 export default function Appearance() {
+    setLayoutProps<AppLayoutProps>({
+        headerDescription: 'Elige cómo quieres ver tu cuenta',
+        headerActions: undefined,
+    });
+
     return (
         <>
             <Head title="Configuración de apariencia" />
@@ -11,11 +16,6 @@ export default function Appearance() {
             <h1 className="sr-only">Configuración de apariencia</h1>
 
             <div className="space-y-6">
-                <Heading
-                    variant="small"
-                    title="Apariencia"
-                    description="Elige cómo quieres ver tu cuenta"
-                />
                 <AppearanceTabs />
             </div>
         </>

@@ -15,3 +15,23 @@ export default function AuthLayout({
         </AuthLayoutTemplate>
     );
 }
+
+export function TwoFactorAuthLayout({
+    title = '',
+    description = '',
+    children,
+}: {
+    title?: string;
+    description?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <AuthLayoutTemplate
+            title={title}
+            description={description}
+            showFooter={false}
+        >
+            {children}
+        </AuthLayoutTemplate>
+    );
+}

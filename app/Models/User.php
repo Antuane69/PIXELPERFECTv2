@@ -24,6 +24,8 @@ use Spatie\Permission\Traits\HasRoles;
  * @property int $id
  * @property string $name
  * @property string $email
+ * @property string|null $avatar
+ * @property string|null $avatar_mime_type
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -33,7 +35,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'avatar', 'avatar_mime_type'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -69,7 +71,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return LogOptions::defaults()
             ->useLogName('usuarios')
-            ->logOnly(['name', 'email', 'email_verified_at'])
+            ->logOnly(['name', 'email', 'email_verified_at', 'avatar_mime_type'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }

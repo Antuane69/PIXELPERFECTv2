@@ -15,14 +15,29 @@ export default function AuthCardLayout({
     children,
     title,
     description,
+    showFooter = true,
 }: PropsWithChildren<{
     name?: string;
     title?: string;
     description?: string;
+    showFooter?: boolean;
 }>) {
     return (
-        <div className="flex min-h-svh flex-col bg-muted">
-            <main className="flex flex-1 items-center justify-center p-6 md:p-10">
+        <div className="relative flex min-h-svh flex-col overflow-hidden bg-[#f8f6f2] text-[#211d29] dark:bg-[#17131c] dark:text-[#f7f2ff]">
+            <div
+                className="pointer-events-none absolute inset-0 [background-image:linear-gradient(to_right,rgba(33,29,41,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(33,29,41,0.06)_1px,transparent_1px)] [mask-image:linear-gradient(to_bottom,black,transparent)] [background-size:4rem_4rem] opacity-60 dark:opacity-20"
+                aria-hidden="true"
+            />
+            <div
+                className="pointer-events-none absolute -top-32 right-[-10rem] size-[34rem] rounded-full bg-[#e9d5ff]/70 blur-3xl dark:bg-[#7e22ce]/20"
+                aria-hidden="true"
+            />
+            <div
+                className="pointer-events-none absolute -bottom-40 left-[-10rem] size-[30rem] rounded-full bg-[#d9f99d]/60 blur-3xl dark:bg-[#65a30d]/10"
+                aria-hidden="true"
+            />
+
+            <main className="relative flex flex-1 items-center justify-center p-6 md:p-10">
                 <div className="flex w-full max-w-md flex-col gap-6">
                     <div className="flex flex-col gap-6">
                         <Card className="overflow-hidden rounded-2xl shadow-md">
@@ -46,7 +61,7 @@ export default function AuthCardLayout({
                     </div>
                 </div>
             </main>
-            <SiteFooter />
+            {showFooter && <SiteFooter />}
         </div>
     );
 }

@@ -1,4 +1,6 @@
+import { setLayoutProps } from '@inertiajs/react';
 import type { ReactNode } from 'react';
+import type { AppLayoutProps } from '@/types';
 
 type ResourceHeaderProps = {
     title: string;
@@ -6,22 +8,11 @@ type ResourceHeaderProps = {
     actions?: ReactNode;
 };
 
-export function ResourceHeader({
-    title,
-    description,
-    actions,
-}: ResourceHeaderProps) {
-    return (
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="grid gap-1">
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                    {title}
-                </h1>
-                <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
-                    {description}
-                </p>
-            </div>
-            {actions ? <div className="shrink-0">{actions}</div> : null}
-        </header>
-    );
+export function ResourceHeader({ description, actions }: ResourceHeaderProps) {
+    setLayoutProps<AppLayoutProps>({
+        headerDescription: description,
+        headerActions: actions,
+    });
+
+    return null;
 }
