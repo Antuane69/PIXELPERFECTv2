@@ -111,12 +111,12 @@ class FortifyServiceProvider extends ServiceProvider
             $expiresInMinutes = (int) config('auth.passwords.users.expire', 60);
 
             return (new MailMessage)
-                ->subject('Restablece tu contraseña')
-                ->greeting("Hola, {$user->name}")
-                ->line('Recibimos una solicitud para restablecer la contraseña de tu cuenta.')
-                ->action('Restablecer contraseña', $resetUrl)
-                ->line("Este enlace vencerá en {$expiresInMinutes} minutos.")
-                ->line('Si no solicitaste el cambio, no necesitas realizar ninguna acción.');
+                ->subject('Restablece tu contraseña | Pixel Perfect')
+                ->view('emails.password-reset', [
+                    'name' => $user->name,
+                    'resetUrl' => $resetUrl,
+                    'expirationMinutes' => $expiresInMinutes,
+                ]);
         });
     }
 

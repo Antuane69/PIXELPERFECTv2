@@ -4,6 +4,7 @@ namespace App\Actions\Empleados;
 
 use App\Models\Empleado;
 use App\Models\EmpleadoDocumento;
+use App\Services\ImageCompressor;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Http\UploadedFile;
@@ -17,6 +18,10 @@ use Throwable;
 class SaveEmpleado
 {
     private const PRIVATE_DISK = 'local';
+
+    public function __construct(
+        private readonly ImageCompressor $imageCompressor,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -56,10 +61,11 @@ class SaveEmpleado
                 $lockedEmpleado->save();
 
                 if ($avatar instanceof UploadedFile) {
-                    $avatarPath = $this->storeFile(
+                    $storedAvatar = $this->storeFile(
                         $avatar,
                         "empleados/{$lockedEmpleado->getKey()}/avatar",
                     );
+                    $avatarPath = $storedAvatar['path'];
                     $storedFiles[] = ['disk' => self::PRIVATE_DISK, 'path' => $avatarPath];
 
                     if (is_string($lockedEmpleado->avatar) && $lockedEmpleado->avatar !== '') {
@@ -100,10 +106,11 @@ class SaveEmpleado
                         continue;
                     }
 
-                    $newPath = $this->storeFile(
+                    $storedDocument = $this->storeFile(
                         $archivo,
                         "empleados/{$lockedEmpleado->getKey()}/documentos",
                     );
+                    $newPath = $storedDocument['path'];
                     $storedFiles[] = ['disk' => self::PRIVATE_DISK, 'path' => $newPath];
 
                     if ($documento !== null && $documento->ruta !== '') {
@@ -120,8 +127,8 @@ class SaveEmpleado
                         'nombre_original' => $this->safeOriginalName($archivo),
                         'ruta' => $newPath,
                         'disco' => self::PRIVATE_DISK,
-                        'mime_type' => $archivo->getMimeType() ?: 'application/octet-stream',
-                        'tamano' => $archivo->getSize() ?: 0,
+                        'mime_type' => $storedDocument['mime_type'],
+                        'tamano' => $storedDocument['size'],
                         'vence_el' => $documentoData['vence_el'] ?? null,
                     ]);
                     $documento->deleted_at = null;
@@ -141,15 +148,39 @@ class SaveEmpleado
         return $savedEmpleado->refresh()->load(['puesto', 'documentos.tipoDocumento']);
     }
 
-    private function storeFile(UploadedFile $file, string $directory): string
+    /**
+     * @return array{path: string, mime_type: string, size: int}
+     */
+    private function storeFile(UploadedFile $file, string $directory): array
     {
+        $compressedImage = $this->imageCompressor->compressIfImage($file);
+
+        if ($compressedImage !== null) {
+            $path = $directory.'/'.Str::uuid().'.'.$compressedImage['extension'];
+            $stored = Storage::disk(self::PRIVATE_DISK)->put($path, $compressedImage['contents']);
+
+            if (! $stored) {
+                throw new RuntimeException('No se pudo almacenar la imagen privada del empleado.');
+            }
+
+            return [
+                'path' => $path,
+                'mime_type' => $compressedImage['mime_type'],
+                'size' => strlen($compressedImage['contents']),
+            ];
+        }
+
         $path = $file->store($directory, self::PRIVATE_DISK);
 
         if (! is_string($path) || $path === '') {
             throw new RuntimeException('No se pudo almacenar el archivo privado del empleado.');
         }
 
-        return $path;
+        return [
+            'path' => $path,
+            'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
+            'size' => $file->getSize() ?: 0,
+        ];
     }
 
     private function applyTrialContractDates(Empleado $empleado): void

@@ -2,7 +2,6 @@ import { router } from '@inertiajs/react';
 import {
     CalendarDays,
     Check,
-    Filter,
     Search,
     SlidersHorizontal,
     X,
@@ -510,9 +509,6 @@ export function FiltrosBase({
                                 )}
                             >
                                 <SheetHeader className="border-b bg-muted/35 px-5 py-5 text-left">
-                                    <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                        <Filter className="size-5" />
-                                    </div>
                                     <SheetTitle className="text-lg">
                                         {title}
                                     </SheetTitle>

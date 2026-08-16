@@ -6,13 +6,23 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 type ImagePreviewProps = {
     src: string;
     active: boolean;
+    alt?: string;
+    className?: string;
+    size?: number;
 };
 
-export function ImagePreview({ src, active }: ImagePreviewProps) {
+export function ImagePreview({
+    src,
+    active,
+    alt = 'Vista previa de imagen',
+    className,
+    size = 48,
+}: ImagePreviewProps) {
     const [open, setOpen] = useState(false);
 
     if (!active || !src) {
@@ -22,10 +32,10 @@ export function ImagePreview({ src, active }: ImagePreviewProps) {
     return (
         <AntImage
             src={src}
-            alt="Vista previa de imagen"
-            width={48}
-            height={48}
-            className="size-12 shrink-0 rounded-md object-cover"
+            alt={alt}
+            width={size}
+            height={size}
+            className={cn('shrink-0 rounded-md object-cover', className)}
             preview={{
                 cover: (
                     <Tooltip>
@@ -52,9 +62,9 @@ export function ImagePreview({ src, active }: ImagePreviewProps) {
 }
 
 function getPreviewContainer(): HTMLElement {
-    const dialogs = document.querySelectorAll<HTMLElement>(
-        '[data-slot="dialog-content"][data-state="open"]',
+    const overlays = document.querySelectorAll<HTMLElement>(
+        '[data-slot="dialog-content"][data-state="open"], [data-slot="sheet-content"][data-state="open"]',
     );
 
-    return dialogs.item(dialogs.length - 1) ?? document.body;
+    return overlays.item(overlays.length - 1) ?? document.body;
 }

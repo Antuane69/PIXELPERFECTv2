@@ -123,6 +123,39 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
             );
     }
 
+    public function test_document_type_pagination_preserves_active_filters_on_the_second_page(): void
+    {
+        foreach (range(1, 7) as $index) {
+            TipoDocumentoEmpleado::factory()->renewable()->create([
+                'nombre' => sprintf('TIPO PAGINADO %02d', $index),
+                'activo' => true,
+            ]);
+        }
+
+        $this->actingAs($this->administrator)
+            ->get(route('tipos-documento-empleados.index', [
+                'search' => 'TIPO PAGINADO',
+                'activo' => true,
+                'es_renovable' => true,
+                'per_page' => 5,
+                'page' => 2,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('tipos-documento-empleados/index')
+                ->where('tiposDocumento.current_page', 2)
+                ->where('tiposDocumento.per_page', 5)
+                ->has('tiposDocumento.data', 2)
+                ->where('tiposDocumento.links.0.url', fn (mixed $url): bool => $this->urlContainsQuery($url, [
+                    'search' => 'TIPO PAGINADO',
+                    'activo' => 1,
+                    'es_renovable' => 1,
+                    'per_page' => 5,
+                    'page' => 1,
+                ])),
+            );
+    }
+
     public function test_document_type_in_use_cannot_be_deleted(): void
     {
         $tipoDocumento = TipoDocumentoEmpleado::factory()->create();

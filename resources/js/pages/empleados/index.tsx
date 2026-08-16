@@ -9,11 +9,13 @@ import {
     update,
 } from '@/actions/App/Http/Controllers/EmpleadoController';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
+import { EmpleadoDetailDrawer } from '@/components/empleados/empleado-detail-drawer';
 import { EmpleadoFormFields } from '@/components/empleados/empleado-form-fields';
 import { FiltrosBase } from '@/components/filtros-base';
 import type { FilterFacet } from '@/components/filtros-base';
 import { ResourceExportDialog } from '@/components/resource-export-dialog';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
+import { ResourceFormDrawer } from '@/components/resource-form-drawer';
 import { ResourceHeader } from '@/components/resource-header';
 import { ResourcePagination } from '@/components/resource-pagination';
 import { ResourceTable } from '@/components/resource-table';
@@ -49,9 +51,10 @@ export default function EmpleadosIndex({
     filters,
 }: Props) {
     const { can } = usePermissions();
-    const [dialogOpen, setDialogOpen] = useState(false);
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Empleado | null>(null);
     const [deleting, setDeleting] = useState<Empleado | null>(null);
+    const [viewing, setViewing] = useState<Empleado | null>(null);
     const showingArchived = filters?.archivados ?? false;
     const filterFacets: FilterFacet[] = [
         {
@@ -148,7 +151,10 @@ export default function EmpleadosIndex({
             header: 'Acciones',
             className: 'md:w-32',
             cell: (empleado) => (
-                <div className="flex justify-end gap-2 md:justify-start">
+                <div
+                    data-row-click-ignore
+                    className="flex justify-end gap-2 md:justify-start"
+                >
                     {showingArchived && can('empleados.update') && (
                         <RestoreButton
                             form={restore.form(empleado.id)}
@@ -161,7 +167,6 @@ export default function EmpleadosIndex({
                             variant="outline"
                             onClick={() => {
                                 setEditing(empleado);
-                                setDialogOpen(true);
                             }}
                             aria-label={`Editar a ${empleado.nombre}`}
                         >
@@ -205,8 +210,7 @@ export default function EmpleadosIndex({
                             {!showingArchived && can('empleados.create') && (
                                 <Button
                                     onClick={() => {
-                                        setEditing(null);
-                                        setDialogOpen(true);
+                                        setCreateDialogOpen(true);
                                     }}
                                 >
                                     <Plus /> Nuevo empleado
@@ -236,24 +240,73 @@ export default function EmpleadosIndex({
                             ? 'No hay empleados archivados'
                             : 'No hay empleados'
                     }
+                    onRowClick={setViewing}
+                    getRowAriaLabel={(empleado) =>
+                        `Ver detalle de ${empleado.nombre}`
+                    }
                 />
                 <ResourcePagination paginator={empleados} />
             </main>
 
-            {dialogOpen && (
+            {viewing && (
+                <EmpleadoDetailDrawer
+                    empleado={viewing}
+                    tiposDocumento={tiposDocumento}
+                    open
+                    onOpenChange={(open) => !open && setViewing(null)}
+                    onEdit={
+                        !showingArchived && can('empleados.update')
+                            ? () => {
+                                  setViewing(null);
+                                  setEditing(viewing);
+                              }
+                            : undefined
+                    }
+                    onDelete={
+                        !showingArchived && can('empleados.delete')
+                            ? () => {
+                                  setViewing(null);
+                                  setDeleting(viewing);
+                              }
+                            : undefined
+                    }
+                />
+            )}
+
+            {createDialogOpen && (
                 <ResourceFormDialog
-                    open={dialogOpen}
-                    onOpenChange={setDialogOpen}
-                    title={editing ? 'Editar empleado' : 'Nuevo empleado'}
+                    open={createDialogOpen}
+                    onOpenChange={setCreateDialogOpen}
+                    title="Nuevo empleado"
                     description="Completa el expediente. Los errores se muestran junto a cada campo."
                     formId="empleado-form"
-                    form={editing ? update.form(editing.id) : store.form()}
-                    resetOnSuccess={!editing}
+                    form={store.form()}
+                    resetOnSuccess
                     noValidate
-                    submitLabel={
-                        editing ? 'Actualizar empleado' : 'Crear empleado'
-                    }
+                    submitLabel="Crear empleado"
                     className="sm:max-w-6xl"
+                >
+                    {(errors) => (
+                        <EmpleadoFormFields
+                            empleado={null}
+                            puestos={puestos}
+                            tiposDocumento={tiposDocumento}
+                            errors={errors}
+                        />
+                    )}
+                </ResourceFormDialog>
+            )}
+
+            {editing && (
+                <ResourceFormDrawer
+                    open
+                    onOpenChange={(open) => !open && setEditing(null)}
+                    title={`Editar ${editing.nombre}`}
+                    description="Actualiza datos del expediente y documentos del empleado."
+                    formId="empleado-edit-form"
+                    form={update.form(editing.id)}
+                    noValidate
+                    submitLabel="Actualizar empleado"
                 >
                     {(errors) => (
                         <EmpleadoFormFields
@@ -263,7 +316,7 @@ export default function EmpleadosIndex({
                             errors={errors}
                         />
                     )}
-                </ResourceFormDialog>
+                </ResourceFormDrawer>
             )}
 
             {deleting && (

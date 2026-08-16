@@ -83,6 +83,7 @@ Unknown business rules must be marked as `No verificable` and confirmed before p
 - Controllers authorize, call an Action or Service, flash feedback, and build the response. Transactions, file storage, relation synchronization, locks, and non-trivial domain rules belong in focused Actions or Services.
 - Use database transactions for atomic mutations. Coordinate stored-file cleanup because a database rollback does not delete files.
 - Private or sensitive files stay on a private disk and are served only through authorized, scoped routes. Validate extension, MIME type, size, generated storage name, and download ownership.
+- Toda imagen adjunta debe pasar por `App\Services\ImageCompressor::compressIfImage()` antes de guardarse en la base de datos o en almacenamiento. Mantener compresión centralizada y usar `config/media.php`; archivos no gráficos conservan su flujo normal.
 - Protect every list, create, update, delete, restore, download, and special action with a Policy, Gate, or authorized Form Request.
 - Add permissions to `RolesAndPermissionsSeeder`; permission names must match Policies, shared Inertia props, navigation, and frontend visibility.
 - Use named routes, implicit binding, and scoped bindings for child resources.
@@ -111,6 +112,8 @@ Pagination is not considered verified by checking `per_page` alone. Tests must c
 - Use Wayfinder imports from `@/actions` or `@/routes`; never hardcode application URLs.
 - Use Inertia v3 `<Form>`, `useForm`, `useHttp`, `<Link>`, or `router` patterns. Do not introduce Axios.
 - Reuse shared building blocks before creating module-specific JSX: `ResourceHeader`, `ResourceSearch`, `ResourceTable`, `ResourcePagination`, `ResourceFormDialog`, `ConfirmDeleteDialog`, `ArchivedRecordsToggle`, and `RestoreButton`.
+- Every Inertia page runs inside `GlobalLoaderProvider`, which displays a full-page loader automatically for Inertia visits, CRUD, filters, pagination, exports, same-origin `fetch`, `XMLHttpRequest`, and `useHttp` requests. Keep button-level spinners as supplementary feedback, never as the only loading state.
+- For asynchronous work not visible to the global request listeners, use `useGlobalLoading(isLoading, message)` or `useGlobalLoader().withLoader(task, message)`. Manual handles use `showLoader(message)` and `hideLoader(id)` in a `try/finally` block.
 - Keep pages as composition layers. Put reusable domain-specific form or table parts under `resources/js/features/<module>/` or the established compatible module folder.
 - Keep server data in Inertia props and transient UI state in React. Do not duplicate server truth in local state.
 - Type props, paginators, nullable fields, relations, filters, permissions, and validation errors accurately.

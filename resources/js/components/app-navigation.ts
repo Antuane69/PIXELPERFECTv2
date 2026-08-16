@@ -1,6 +1,7 @@
 import {
     BriefcaseBusiness,
     FileCheck2,
+    FileText,
     LayoutDashboard,
     ShieldCheck,
     UserRoundCog,
@@ -12,6 +13,7 @@ import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleControll
 import { index as tiposDocumentoIndex } from '@/actions/App/Http/Controllers/TipoDocumentoEmpleadoController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
 import { dashboard } from '@/routes';
+import { index as logsIndex } from '@/routes/logs';
 import type { NavItem } from '@/types';
 
 export const mainNavItems: NavItem[] = [
@@ -19,6 +21,12 @@ export const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutDashboard,
+    },
+    {
+        title: 'Logs del sistema',
+        href: logsIndex(),
+        icon: FileText,
+        permission: 'logs.view',
     },
     {
         title: 'Usuarios',

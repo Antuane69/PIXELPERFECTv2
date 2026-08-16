@@ -69,6 +69,7 @@ export type EmpleadoDocumento = {
     nombre?: string | null;
     vence_el?: string | null;
     download_url?: string | null;
+    preview_url?: string | null;
     mime_type?: string | null;
     tamano?: number | null;
     tipo?: Pick<TipoDocumentoEmpleado, 'id' | 'nombre'> | null;
@@ -104,7 +105,13 @@ export type Empleado = {
     periodo_prueba_meses?: number | null;
     fecha_contrato_siguiente?: string | null;
     fecha_contrato_indefinido?: string | null;
+    fecha_ultimo_aviso?: string | null;
+    fecha_evaluacion?: string | null;
+    fecha_inicio_contrato?: string | null;
+    fecha_termino_contrato?: string | null;
     documentos?: EmpleadoDocumento[];
+    created_at?: string | null;
+    updated_at?: string | null;
     deleted_at?: string | null;
 };
 

@@ -38,6 +38,29 @@ class PasswordResetTest extends TestCase
         Notification::assertSentTo($user, ResetPassword::class);
     }
 
+    public function test_reset_password_email_uses_branded_template(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create(['name' => 'María López']);
+
+        $this->post(route('password.email'), ['email' => $user->email]);
+
+        Notification::assertSentTo($user, ResetPassword::class, function (ResetPassword $notification) use ($user): bool {
+            $mailMessage = $notification->toMail($user);
+            $html = (string) $mailMessage->render();
+
+            $this->assertSame('Restablece tu contraseña | Pixel Perfect', $mailMessage->subject);
+            $this->assertStringContainsString('PIXEL', $html);
+            $this->assertStringContainsString('PERFECT', $html);
+            $this->assertStringContainsString('Hola, María López', $html);
+            $this->assertStringContainsString('Restablecer contraseña', $html);
+            $this->assertStringContainsString($notification->token, $html);
+
+            return true;
+        });
+    }
+
     public function test_reset_password_screen_can_be_rendered()
     {
         Notification::fake();

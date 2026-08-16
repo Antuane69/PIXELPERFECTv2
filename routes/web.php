@@ -7,12 +7,14 @@ use App\Http\Controllers\ExportController;
 use App\Http\Controllers\PuestoController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ShowEmpleadoAvatarController;
+use App\Http\Controllers\ShowEmpleadoDocumentoController;
 use App\Http\Controllers\TipoDocumentoEmpleadoController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 Route::get('/', static function (): Response|RedirectResponse {
     if (auth()->check()) {
@@ -24,6 +26,9 @@ Route::get('/', static function (): Response|RedirectResponse {
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    Route::get('logs', static fn (): SymfonyResponse => Inertia::location(route('log-viewer.index')))
+        ->name('logs.index');
 
     Route::post('reportes/{reporte}/exportar', [ExportController::class, 'exportar'])
         ->name('reportes.exportar');
@@ -48,6 +53,11 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     Route::get('empleados/{empleado}/avatar', ShowEmpleadoAvatarController::class)
         ->name('empleados.avatar');
+
+    Route::get(
+        'empleados/{empleado}/documentos/{documento}/preview',
+        ShowEmpleadoDocumentoController::class,
+    )->scopeBindings()->name('empleados.documentos.preview');
 
     Route::get(
         'empleados/{empleado}/documentos/{documento}/download',

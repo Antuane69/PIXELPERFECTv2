@@ -6,6 +6,7 @@ use App\Actions\Users\EnsureAdministratorRemains;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
+use App\Services\ImageCompressor;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,11 +14,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 
 class ProfileController extends Controller
 {
     public function __construct(
         private readonly EnsureAdministratorRemains $ensureAdministratorRemains,
+        private readonly ImageCompressor $imageCompressor,
     ) {}
 
     /**
@@ -44,9 +47,15 @@ class ProfileController extends Controller
         $request->user()->fill($data);
 
         if ($avatar !== null) {
+            $compressedAvatar = $this->imageCompressor->compressIfImage($avatar);
+
+            if ($compressedAvatar === null) {
+                throw new RuntimeException('No se pudo comprimir el avatar.');
+            }
+
             $request->user()->forceFill([
-                'avatar' => $avatar->getContent(),
-                'avatar_mime_type' => $avatar->getMimeType(),
+                'avatar' => $compressedAvatar['contents'],
+                'avatar_mime_type' => $compressedAvatar['mime_type'],
             ]);
         }
 

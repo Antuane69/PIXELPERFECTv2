@@ -115,6 +115,37 @@ class PuestoManagementTest extends TestCase
             );
     }
 
+    public function test_position_pagination_preserves_active_filters_on_the_second_page(): void
+    {
+        foreach (range(1, 7) as $index) {
+            Puesto::factory()->create([
+                'nombre' => sprintf('Puesto Paginado %02d', $index),
+                'activo' => true,
+            ]);
+        }
+
+        $this->actingAs($this->administrator)
+            ->get(route('puestos.index', [
+                'search' => 'Puesto Paginado',
+                'activo' => true,
+                'per_page' => 5,
+                'page' => 2,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('puestos/index')
+                ->where('puestos.current_page', 2)
+                ->where('puestos.per_page', 5)
+                ->has('puestos.data', 2)
+                ->where('puestos.links.0.url', fn (mixed $url): bool => $this->urlContainsQuery($url, [
+                    'search' => 'Puesto Paginado',
+                    'activo' => 1,
+                    'per_page' => 5,
+                    'page' => 1,
+                ])),
+            );
+    }
+
     public function test_position_assigned_to_an_employee_cannot_be_deleted(): void
     {
         $puesto = Puesto::factory()->create();

@@ -22,7 +22,7 @@ class ProfileUpdateRequest extends FormRequest
             ...$this->profileRules($this->user()->id),
             'avatar' => [
                 'nullable',
-                File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max('2mb'),
+                File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max('5mb'),
             ],
         ];
     }

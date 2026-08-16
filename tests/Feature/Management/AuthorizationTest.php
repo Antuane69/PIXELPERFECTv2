@@ -50,7 +50,7 @@ class AuthorizationTest extends TestCase
                 ->component('users/index')
                 ->where('auth.user.id', $administrator->id)
                 ->where('auth.user.roles', ['Administrador'])
-                ->has('auth.user.permissions', 21)
+                ->has('auth.user.permissions', 23)
                 ->missing('auth.user.password')
                 ->missing('auth.user.two_factor_secret'),
             );
@@ -63,8 +63,8 @@ class AuthorizationTest extends TestCase
 
         $administrator = Role::findByName('Administrador', 'web');
 
-        $this->assertSame(21, Permission::query()->where('guard_name', 'web')->count());
-        $this->assertSame(21, $administrator->permissions()->count());
+        $this->assertSame(23, Permission::query()->where('guard_name', 'web')->count());
+        $this->assertSame(23, $administrator->permissions()->count());
     }
 
     public function test_dashboard_does_not_expose_counts_without_resource_permissions(): void

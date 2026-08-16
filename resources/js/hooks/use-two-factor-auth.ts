@@ -1,5 +1,6 @@
 import { useHttp } from '@inertiajs/react';
 import { useCallback, useState } from 'react';
+import { getBackendErrorMessage } from '@/lib/app-alerts';
 import { qrCode, recoveryCodes, secretKey } from '@/routes/two-factor';
 
 export type UseTwoFactorAuthReturn = {
@@ -54,8 +55,14 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
             };
 
             setQrCodeSvg(svg);
-        } catch {
-            setErrors((prev) => [...prev, 'No se pudo obtener el código QR.']);
+        } catch (error: unknown) {
+            setErrors((prev) => [
+                ...prev,
+                getBackendErrorMessage(
+                    error,
+                    'No se pudo obtener el código QR.',
+                ),
+            ]);
             setQrCodeSvg(null);
         }
     }, [submit]);
@@ -67,10 +74,13 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
             };
 
             setManualSetupKey(key);
-        } catch {
+        } catch (error: unknown) {
             setErrors((prev) => [
                 ...prev,
-                'No se pudo obtener la clave de configuración.',
+                getBackendErrorMessage(
+                    error,
+                    'No se pudo obtener la clave de configuración.',
+                ),
             ]);
             setManualSetupKey(null);
         }
@@ -81,10 +91,13 @@ export const useTwoFactorAuth = (): UseTwoFactorAuthReturn => {
             setErrors([]);
             const codes = (await submit(recoveryCodes())) as string[];
             setRecoveryCodesList(codes);
-        } catch {
+        } catch (error: unknown) {
             setErrors((prev) => [
                 ...prev,
-                'No se pudieron obtener los códigos de recuperación.',
+                getBackendErrorMessage(
+                    error,
+                    'No se pudieron obtener los códigos de recuperación.',
+                ),
             ]);
             setRecoveryCodesList([]);
         }

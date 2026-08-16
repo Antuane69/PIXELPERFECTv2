@@ -95,15 +95,23 @@ class ProfileUpdateTest extends TestCase
 
         $user->refresh();
 
-        $this->assertSame($avatarContents, $user->avatar);
+        $this->assertIsString($avatarContents);
+        $this->assertIsString($user->avatar);
         $this->assertSame('image/png', $user->avatar_mime_type);
+
+        $decodedAvatar = imagecreatefromstring($user->avatar);
+
+        $this->assertInstanceOf(\GdImage::class, $decodedAvatar);
+        $this->assertSame(120, imagesx($decodedAvatar));
+        $this->assertSame(120, imagesy($decodedAvatar));
+        imagedestroy($decodedAvatar);
 
         $this->actingAs($user)
             ->get(route('profile.edit'))
             ->assertInertia(
                 fn (Assert $page): Assert => $page->where(
                     'auth.user.avatar',
-                    'data:image/png;base64,'.base64_encode($avatarContents),
+                    'data:image/png;base64,'.base64_encode($user->avatar),
                 ),
             );
     }
@@ -122,6 +130,35 @@ class ProfileUpdateTest extends TestCase
                     10,
                     'text/plain',
                 ),
+            ])
+            ->assertSessionHasErrors('avatar')
+            ->assertRedirect(route('profile.edit'));
+    }
+
+    public function test_profile_avatar_up_to_five_megabytes_is_accepted(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->patch(route('profile.update'), [
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar' => UploadedFile::fake()->image('avatar.png', 120, 120)->size(5000),
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('profile.edit'));
+    }
+
+    public function test_profile_avatar_over_five_megabytes_is_rejected(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->from(route('profile.edit'))
+            ->patch(route('profile.update'), [
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar' => UploadedFile::fake()->image('avatar.png', 120, 120)->size(5001),
             ])
             ->assertSessionHasErrors('avatar')
             ->assertRedirect(route('profile.edit'));

@@ -76,6 +76,10 @@ class EmpleadoController extends Controller
                 'periodo_prueba_meses',
                 'fecha_contrato_siguiente',
                 'fecha_contrato_indefinido',
+                'fecha_ultimo_aviso',
+                'fecha_evaluacion',
+                'fecha_inicio_contrato',
+                'fecha_termino_contrato',
                 'created_at',
                 'updated_at',
                 'deleted_at',
@@ -245,12 +249,16 @@ class EmpleadoController extends Controller
             'prima_vacacional' => $this->decimal($empleado->prima_vacacional),
             'dias_vacaciones' => $empleado->dias_vacaciones,
             'dias_liquidacion' => $empleado->dias_liquidacion,
-            'dias_descanso' => $empleado->dias_descanso,
+            'dias_descanso' => $empleado->dias_descanso ?? [],
             'fecha_ingreso' => $this->date($empleado->fecha_ingreso),
             'fecha_nacimiento' => $this->date($empleado->fecha_nacimiento),
             'periodo_prueba_meses' => $empleado->periodo_prueba_meses,
             'fecha_contrato_siguiente' => $this->date($empleado->fecha_contrato_siguiente),
             'fecha_contrato_indefinido' => $this->date($empleado->fecha_contrato_indefinido),
+            'fecha_ultimo_aviso' => $this->date($empleado->fecha_ultimo_aviso),
+            'fecha_evaluacion' => $this->date($empleado->fecha_evaluacion),
+            'fecha_inicio_contrato' => $this->date($empleado->fecha_inicio_contrato),
+            'fecha_termino_contrato' => $this->date($empleado->fecha_termino_contrato),
             'puesto' => $empleado->puesto === null ? null : [
                 'id' => $empleado->puesto->id,
                 'nombre' => $empleado->puesto->nombre,
@@ -267,6 +275,12 @@ class EmpleadoController extends Controller
                     'mime_type' => $documento->mime_type,
                     'tamano' => $documento->tamano,
                     'vence_el' => $this->date($documento->vence_el),
+                    'preview_url' => $empleado->trashed() || ! str_starts_with($documento->mime_type, 'image/')
+                        ? null
+                        : route('empleados.documentos.preview', [
+                            'empleado' => $empleado,
+                            'documento' => $documento,
+                        ], absolute: false),
                     'download_url' => $empleado->trashed()
                         ? null
                         : route('empleados.documentos.download', [

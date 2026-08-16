@@ -141,6 +141,35 @@ class UserManagementTest extends TestCase
             );
     }
 
+    public function test_user_pagination_preserves_active_filters_on_the_second_page(): void
+    {
+        foreach (range(1, 7) as $index) {
+            User::factory()->create([
+                'name' => sprintf('Usuario Paginado %02d', $index),
+                'email' => sprintf('paginado-%02d@example.com', $index),
+            ]);
+        }
+
+        $this->actingAs($this->administrator)
+            ->get(route('users.index', [
+                'search' => 'Usuario Paginado',
+                'per_page' => 5,
+                'page' => 2,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('users/index')
+                ->where('users.current_page', 2)
+                ->where('users.per_page', 5)
+                ->has('users.data', 2)
+                ->where('users.links.0.url', fn (mixed $url): bool => $this->urlContainsQuery($url, [
+                    'search' => 'Usuario Paginado',
+                    'per_page' => 5,
+                    'page' => 1,
+                ])),
+            );
+    }
+
     public function test_administrator_cannot_delete_their_own_account_but_can_delete_another_user(): void
     {
         $this->actingAs($this->administrator)

@@ -25,6 +25,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'tipos_documento',
         ])->crossJoin(['view', 'create', 'update', 'delete'])
             ->map(static fn (array $parts): string => implode('.', $parts))
+            ->merge(['logs.view', 'logs.delete'])
             ->push('users.assign_roles');
 
         $permissions = $permissionNames->map(

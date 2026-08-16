@@ -34,12 +34,11 @@ export function ConfirmDeleteDialog({
 }: ConfirmDeleteDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="border-t-[3px] border-t-destructive sm:max-w-md">
                 <DialogHeader>
-                    <div className="mb-1 flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                        <Trash2 className="size-5" />
-                    </div>
-                    <DialogTitle>Eliminar {subject}</DialogTitle>
+                    <DialogTitle className="font-bold text-primary">
+                        Eliminar {subject}
+                    </DialogTitle>
                     <DialogDescription>
                         {description ??
                             'Confirma esta acción. El registro dejará de estar disponible para la operación.'}
@@ -81,7 +80,14 @@ export function ConfirmDeleteDialog({
                                         variant="destructive"
                                         disabled={processing}
                                     >
-                                        {processing && <Spinner />}
+                                        {processing ? (
+                                            <Spinner />
+                                        ) : (
+                                            <Trash2
+                                                className="size-4"
+                                                aria-hidden="true"
+                                            />
+                                        )}
                                         Eliminar
                                     </Button>
                                 </DialogFooter>

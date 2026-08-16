@@ -90,6 +90,32 @@ class RoleManagementTest extends TestCase
             );
     }
 
+    public function test_role_pagination_preserves_active_filters_on_the_second_page(): void
+    {
+        foreach (range(1, 7) as $index) {
+            Role::findOrCreate(sprintf('Rol Paginado %02d', $index), 'web');
+        }
+
+        $this->actingAs($this->administrator)
+            ->get(route('roles.index', [
+                'search' => 'Rol Paginado',
+                'per_page' => 5,
+                'page' => 2,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('roles/index')
+                ->where('roles.current_page', 2)
+                ->where('roles.per_page', 5)
+                ->has('roles.data', 2)
+                ->where('roles.links.0.url', fn (mixed $url): bool => $this->urlContainsQuery($url, [
+                    'search' => 'Rol Paginado',
+                    'per_page' => 5,
+                    'page' => 1,
+                ])),
+            );
+    }
+
     public function test_administrator_role_cannot_be_modified_or_deleted(): void
     {
         $administratorRole = Role::findByName('Administrador', 'web');

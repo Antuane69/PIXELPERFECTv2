@@ -1,5 +1,5 @@
 import { Inbox } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import {
     Table,
     TableBody,
@@ -8,6 +8,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 export type ResourceColumn<T> = {
     key: string;
@@ -23,7 +24,12 @@ type ResourceTableProps<T> = {
     getRowKey: (item: T) => string | number;
     emptyTitle?: string;
     emptyDescription?: string;
+    onRowClick?: (item: T) => void;
+    getRowAriaLabel?: (item: T) => string;
 };
+
+const interactiveSelector =
+    'a, button, input, select, textarea, [role="button"], [role="link"], [data-row-click-ignore]';
 
 export function ResourceTable<T>({
     columns,
@@ -31,7 +37,56 @@ export function ResourceTable<T>({
     getRowKey,
     emptyTitle = 'Sin registros',
     emptyDescription = 'No hay información para mostrar con los filtros actuales.',
+    onRowClick,
+    getRowAriaLabel,
 }: ResourceTableProps<T>) {
+    const shouldIgnoreRowClick = (
+        target: EventTarget | null,
+        currentTarget: EventTarget | null,
+    ): boolean => {
+        if (!(target instanceof Element)) {
+            return false;
+        }
+
+        const interactiveElement = target.closest(interactiveSelector);
+
+        return (
+            interactiveElement !== null && interactiveElement !== currentTarget
+        );
+    };
+
+    const handleRowClick = (event: MouseEvent, item: T): void => {
+        if (shouldIgnoreRowClick(event.target, event.currentTarget)) {
+            return;
+        }
+
+        onRowClick?.(item);
+    };
+
+    const handleRowKeyDown = (event: KeyboardEvent, item: T): void => {
+        if (
+            shouldIgnoreRowClick(event.target, event.currentTarget) ||
+            (event.key !== 'Enter' && event.key !== ' ')
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        onRowClick?.(item);
+    };
+
+    const interactiveRowProps = (item: T) =>
+        onRowClick
+            ? {
+                  role: 'button' as const,
+                  tabIndex: 0,
+                  'aria-label': getRowAriaLabel?.(item),
+                  onClick: (event: MouseEvent) => handleRowClick(event, item),
+                  onKeyDown: (event: KeyboardEvent) =>
+                      handleRowKeyDown(event, item),
+              }
+            : {};
+
     if (!data.length) {
         return (
             <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card p-8 text-center">
@@ -66,7 +121,14 @@ export function ResourceTable<T>({
                     </TableHeader>
                     <TableBody>
                         {data.map((item) => (
-                            <TableRow key={getRowKey(item)}>
+                            <TableRow
+                                key={getRowKey(item)}
+                                className={cn(
+                                    onRowClick &&
+                                        'cursor-pointer focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                )}
+                                {...interactiveRowProps(item)}
+                            >
                                 {columns.map((column) => (
                                     <TableCell
                                         key={column.key}
@@ -85,7 +147,12 @@ export function ResourceTable<T>({
                 {data.map((item) => (
                     <article
                         key={getRowKey(item)}
-                        className="grid gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+                        className={cn(
+                            'grid gap-3 rounded-xl border border-border bg-card p-4 shadow-sm',
+                            onRowClick &&
+                                'cursor-pointer transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                        )}
+                        {...interactiveRowProps(item)}
                     >
                         {columns
                             .filter((column) => !column.mobileHidden)

@@ -96,7 +96,7 @@ export default function Profile({
                                             onChange={handleAvatarChange}
                                         />
                                         <p className="text-xs text-muted-foreground">
-                                            JPG, PNG o WEBP. Máximo 2 MB.
+                                            JPG, PNG o WEBP. Máximo 5 MB.
                                         </p>
                                     </div>
                                 </div>

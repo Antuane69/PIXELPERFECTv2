@@ -1,0 +1,96 @@
+[data-sonner-toast].app-alert {
+    --app-alert-accent: var(--primary);
+    --app-alert-background: color-mix(
+        in oklch,
+        var(--popover) 94%,
+        var(--primary) 6%
+    );
+    --app-alert-border: color-mix(in oklch, var(--primary) 26%, var(--border));
+
+    position: relative;
+    overflow: hidden;
+    width: min(420px, calc(100vw - 2rem));
+    border: 1px solid var(--app-alert-border);
+    border-radius: calc(var(--radius) + 0.25rem);
+    background: var(--app-alert-background);
+    color: var(--popover-foreground);
+    box-shadow: 0 18px 42px
+        color-mix(in oklch, var(--foreground) 16%, transparent);
+}
+
+[data-sonner-toast].app-alert::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--app-alert-accent);
+    content: '';
+}
+
+[data-sonner-toast].app-alert[data-type='success'] {
+    --app-alert-accent: color-mix(
+        in oklch,
+        var(--primary) 72%,
+        var(--accent) 28%
+    );
+    --app-alert-background: color-mix(
+        in oklch,
+        var(--popover) 92%,
+        var(--accent) 8%
+    );
+    --app-alert-border: color-mix(in oklch, var(--accent) 34%, var(--border));
+}
+
+[data-sonner-toast].app-alert[data-type='info'] {
+    --app-alert-accent: var(--primary);
+}
+
+[data-sonner-toast].app-alert[data-type='warning'] {
+    --app-alert-accent: color-mix(
+        in oklch,
+        var(--primary) 68%,
+        var(--accent) 32%
+    );
+}
+
+[data-sonner-toast].app-alert[data-type='error'] {
+    --app-alert-accent: var(--destructive);
+    --app-alert-background: color-mix(
+        in oklch,
+        var(--popover) 92%,
+        var(--destructive) 8%
+    );
+    --app-alert-border: color-mix(
+        in oklch,
+        var(--destructive) 34%,
+        var(--border)
+    );
+}
+
+[data-sonner-toast].app-alert [data-title] {
+    color: var(--popover-foreground);
+    font-weight: 700;
+}
+
+[data-sonner-toast].app-alert [data-description] {
+    color: var(--muted-foreground);
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+[data-sonner-toast].app-alert [data-close-button] {
+    border-color: var(--border);
+    background: var(--background);
+    color: var(--muted-foreground);
+}
+
+@media (max-width: 640px) {
+    [data-sonner-toaster][data-x-position='right'] {
+        right: 1rem;
+        left: 1rem;
+        width: auto;
+    }
+
+    [data-sonner-toast].app-alert {
+        width: 100%;
+    }
+}
