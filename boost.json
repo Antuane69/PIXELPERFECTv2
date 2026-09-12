@@ -5,6 +5,7 @@
     "cloud": false,
     "guidelines": true,
     "skills": [
+        "cashier-stripe-development",
         "fortify-development",
         "laravel-best-practices",
         "wayfinder-development",

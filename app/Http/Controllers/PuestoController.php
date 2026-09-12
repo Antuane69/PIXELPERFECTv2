@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Puestos\StorePuestoRequest;
 use App\Http\Requests\Puestos\UpdatePuestoRequest;
+use App\Models\Empresa;
 use App\Models\Puesto;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -20,7 +21,7 @@ class PuestoController extends Controller
     /**
      * Display a paginated position listing.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, Empresa $empresa): Response
     {
         Gate::authorize('viewAny', Puesto::class);
 
@@ -30,6 +31,7 @@ class PuestoController extends Controller
 
         $puestos = Puesto::query()
             ->select(['id', 'nombre', 'salario_dia', 'salario_quincena', 'activo', 'deleted_at'])
+            ->whereBelongsTo($empresa)
             ->withCount('empleados')
             ->when($archivados, fn (Builder $query) => $query->onlyTrashed())
             ->when($search !== '', fn (Builder $query) => $query->where('nombre', 'like', "%{$search}%"))
@@ -64,21 +66,29 @@ class PuestoController extends Controller
     /**
      * Store a newly created position.
      */
-    public function store(StorePuestoRequest $request): RedirectResponse
+    public function store(StorePuestoRequest $request, Empresa $empresa): RedirectResponse
     {
         Gate::authorize('create', Puesto::class);
 
-        Puesto::query()->create($request->validated());
+        Puesto::query()->create([
+            'empresa_id' => $empresa->id,
+            ...$request->validated(),
+        ]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Puesto creado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'puestos.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.puestos.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
      * Update the specified position.
      */
-    public function update(UpdatePuestoRequest $request, Puesto $puesto): RedirectResponse
+    public function update(UpdatePuestoRequest $request, Empresa $empresa, Puesto $puesto): RedirectResponse
     {
         Gate::authorize('update', $puesto);
 
@@ -86,13 +96,18 @@ class PuestoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Puesto actualizado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'puestos.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.puestos.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
      * Soft delete the specified position when it is unused.
      */
-    public function destroy(Request $request, Puesto $puesto): RedirectResponse
+    public function destroy(Request $request, Empresa $empresa, Puesto $puesto): RedirectResponse
     {
         Gate::authorize('delete', $puesto);
 
@@ -106,13 +121,18 @@ class PuestoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Puesto eliminado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'puestos.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.puestos.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
      * Restore the specified archived position.
      */
-    public function restore(Request $request, Puesto $puesto): RedirectResponse
+    public function restore(Request $request, Empresa $empresa, Puesto $puesto): RedirectResponse
     {
         Gate::authorize('restore', $puesto);
 
@@ -122,9 +142,9 @@ class PuestoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'puestos.index',
+            'empresas.puestos.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['archivados' => true],
+            ['empresa' => $empresa, 'archivados' => true],
         );
     }
 

@@ -1,12 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
-import {
-    BriefcaseBusiness,
-    FileCheck2,
-    UserRoundCog,
-    UsersRound,
-} from 'lucide-react';
-import { index as empleadosIndex } from '@/actions/App/Http/Controllers/EmpleadoController';
-import { index as puestosIndex } from '@/actions/App/Http/Controllers/PuestoController';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { FileCheck2, UserRoundCog } from 'lucide-react';
 import { index as tiposDocumentoIndex } from '@/actions/App/Http/Controllers/TipoDocumentoEmpleadoController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
 import { ResourceHeader } from '@/components/resource-header';
@@ -27,33 +20,16 @@ type Props = {
 
 export default function Dashboard({ stats }: Props) {
     const { can } = usePermissions();
+    const empresa = usePage().props.empresas.activa;
     const cards = [
         {
             title: 'Usuarios',
             description: 'Cuentas con acceso al sistema',
             value: stats.users,
             icon: UserRoundCog,
-            href: usersIndex(),
+            href: empresa ? usersIndex(empresa.slug) : dashboard(),
             permission: 'users.view',
             accent: 'bg-violet-500/12 text-violet-700 dark:text-violet-300',
-        },
-        {
-            title: 'Empleados',
-            description: 'Expedientes registrados',
-            value: stats.empleados,
-            icon: UsersRound,
-            href: empleadosIndex(),
-            permission: 'empleados.view',
-            accent: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
-        },
-        {
-            title: 'Puestos',
-            description: 'Puestos del catálogo laboral',
-            value: stats.puestosActivos,
-            icon: BriefcaseBusiness,
-            href: puestosIndex(),
-            permission: 'puestos.view',
-            accent: 'bg-fuchsia-500/12 text-fuchsia-700 dark:text-fuchsia-300',
         },
         {
             title: 'Tipos de documento',
@@ -61,7 +37,7 @@ export default function Dashboard({ stats }: Props) {
             value: stats.tiposDocumentoActivos,
             icon: FileCheck2,
             href: tiposDocumentoIndex(),
-            permission: 'tipos_documento.view',
+            permission: '*',
             accent: 'bg-teal-500/12 text-teal-700 dark:text-teal-300',
         },
     ];

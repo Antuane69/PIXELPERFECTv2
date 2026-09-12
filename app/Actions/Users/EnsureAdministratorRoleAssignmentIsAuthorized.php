@@ -2,9 +2,9 @@
 
 namespace App\Actions\Users;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
-use Spatie\Permission\Models\Role;
 
 class EnsureAdministratorRoleAssignmentIsAuthorized
 {
@@ -13,7 +13,7 @@ class EnsureAdministratorRoleAssignmentIsAuthorized
      */
     public function handle(User $actor, array $roleIds, ?User $target = null): void
     {
-        if ($actor->hasRole('Administrador', 'web')) {
+        if ($actor->es_superadministrador_plataforma || $actor->hasRole('Administrador', 'web')) {
             return;
         }
 
@@ -38,6 +38,7 @@ class EnsureAdministratorRoleAssignmentIsAuthorized
         }
 
         $administratorRoleId = Role::query()
+            ->where('empresa_id', getPermissionsTeamId())
             ->where('name', 'Administrador')
             ->where('guard_name', 'web')
             ->value('id');

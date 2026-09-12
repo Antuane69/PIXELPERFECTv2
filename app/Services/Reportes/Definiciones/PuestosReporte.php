@@ -3,6 +3,7 @@
 namespace App\Services\Reportes\Definiciones;
 
 use App\Models\Puesto;
+use App\Services\Empresas\EmpresaContext;
 use App\Services\Reportes\Contracts\ReporteExportable;
 use App\Services\Reportes\ExportConfig;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
 
 class PuestosReporte implements ReporteExportable
 {
+    public function __construct(private EmpresaContext $empresaContext) {}
+
     /** @param array<string, mixed> $filtros */
     public function autorizar(Authenticatable $usuario, array $filtros): void
     {
@@ -42,6 +45,7 @@ class PuestosReporte implements ReporteExportable
 
         return Puesto::query()
             ->select(['id', 'nombre', 'salario_dia', 'salario_quincena', 'activo', 'deleted_at'])
+            ->where('empresa_id', $this->empresaContext->empresaRequerida()->id)
             ->withCount('empleados')
             ->when((bool) ($filtros['archivados'] ?? false), fn (Builder $query) => $query->onlyTrashed())
             ->when($search !== '', fn (Builder $query) => $query->where('nombre', 'like', "%{$search}%"))

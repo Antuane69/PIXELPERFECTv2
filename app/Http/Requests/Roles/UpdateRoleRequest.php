@@ -2,15 +2,25 @@
 
 namespace App\Http\Requests\Roles;
 
+use App\Models\Empresa;
+use App\Models\Role;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 
 class UpdateRoleRequest extends FormRequest
 {
+    private const PERMISOS_EXCLUSIVOS_PLATAFORMA = [
+        'logs.view',
+        'logs.delete',
+        'tipos_documento.view',
+        'tipos_documento.create',
+        'tipos_documento.update',
+        'tipos_documento.delete',
+    ];
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -30,6 +40,7 @@ class UpdateRoleRequest extends FormRequest
     {
         /** @var Role $role */
         $role = $this->route('role');
+        $empresa = $this->route('empresa');
 
         return [
             'name' => [
@@ -38,6 +49,7 @@ class UpdateRoleRequest extends FormRequest
                 'max:255',
                 Rule::unique(Role::class, 'name')
                     ->where('guard_name', 'web')
+                    ->where('empresa_id', $empresa instanceof Empresa ? $empresa->id : null)
                     ->ignore($role),
             ],
             'permissions' => ['required', 'array', 'min:1'],
@@ -45,7 +57,11 @@ class UpdateRoleRequest extends FormRequest
                 'required',
                 'integer',
                 'distinct',
-                Rule::exists(Permission::class, 'id')->where('guard_name', 'web'),
+                Rule::exists(Permission::class, 'id')->where(
+                    fn ($query) => $query
+                        ->where('guard_name', 'web')
+                        ->whereNotIn('name', self::PERMISOS_EXCLUSIVOS_PLATAFORMA),
+                ),
             ],
         ];
     }
@@ -68,7 +84,7 @@ class UpdateRoleRequest extends FormRequest
 
                 $user = $this->user();
 
-                if ($user === null || $user->hasRole('Administrador', 'web')) {
+                if ($user === null || $user->es_superadministrador_plataforma || $user->hasRole('Administrador', 'web')) {
                     return;
                 }
 

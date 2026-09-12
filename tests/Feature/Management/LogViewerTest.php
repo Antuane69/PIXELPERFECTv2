@@ -39,10 +39,9 @@ class LogViewerTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_user_with_view_permission_can_open_log_viewer(): void
+    public function test_platform_superadministrator_can_open_log_viewer(): void
     {
-        $user = User::factory()->create();
-        $user->givePermissionTo('logs.view');
+        $user = User::factory()->superadministradorPlataforma()->create();
 
         $this->actingAs($user)
             ->get(route('log-viewer.index'))
@@ -56,13 +55,14 @@ class LogViewerTest extends TestCase
             ->assertJsonFragment([
                 'name' => $file->name,
                 'can_download' => true,
-                'can_delete' => false,
+                'can_delete' => true,
             ]);
     }
 
-    public function test_user_without_view_permission_cannot_open_log_viewer(): void
+    public function test_company_permission_does_not_grant_platform_log_access(): void
     {
         $user = User::factory()->create();
+        $user->givePermissionTo('logs.view');
 
         $this->actingAs($user)
             ->get(route('log-viewer.index'))
@@ -77,8 +77,7 @@ class LogViewerTest extends TestCase
 
     public function test_logs_menu_route_supports_full_page_navigation(): void
     {
-        $user = User::factory()->create();
-        $user->givePermissionTo('logs.view');
+        $user = User::factory()->superadministradorPlataforma()->create();
 
         $this->actingAs($user)
             ->get(route('logs.index'))
@@ -94,10 +93,9 @@ class LogViewerTest extends TestCase
             ->assertHeader('X-Inertia-Location', route('log-viewer.index'));
     }
 
-    public function test_user_with_delete_permission_can_delete_log_file(): void
+    public function test_platform_superadministrator_can_delete_log_file(): void
     {
-        $user = User::factory()->create();
-        $user->givePermissionTo(['logs.view', 'logs.delete']);
+        $user = User::factory()->superadministradorPlataforma()->create();
         $file = $this->test_log_file();
 
         $this->actingAs($user)

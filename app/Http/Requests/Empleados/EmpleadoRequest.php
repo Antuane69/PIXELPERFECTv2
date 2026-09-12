@@ -89,15 +89,18 @@ abstract class EmpleadoRequest extends FormRequest
                 'integer',
                 Rule::exists(Puesto::class, 'id')->where(
                     static function ($query) use ($currentPuestoId): void {
-                        $query->whereNull('deleted_at')->where(
-                            static function ($query) use ($currentPuestoId): void {
-                                $query->where('activo', true);
+                        $query
+                            ->where('empresa_id', getPermissionsTeamId())
+                            ->whereNull('deleted_at')
+                            ->where(
+                                static function ($query) use ($currentPuestoId): void {
+                                    $query->where('activo', true);
 
-                                if ($currentPuestoId !== null) {
-                                    $query->orWhere('id', $currentPuestoId);
-                                }
-                            },
-                        );
+                                    if ($currentPuestoId !== null) {
+                                        $query->orWhere('id', $currentPuestoId);
+                                    }
+                                },
+                            );
                     },
                 ),
             ],
@@ -323,7 +326,8 @@ abstract class EmpleadoRequest extends FormRequest
 
     private function uniqueRule(string $column): Unique
     {
-        $rule = Rule::unique(Empleado::class, $column);
+        $rule = Rule::unique(Empleado::class, $column)
+            ->where('empresa_id', getPermissionsTeamId());
         $empleado = $this->boundEmpleado();
 
         if ($empleado !== null) {

@@ -37,8 +37,14 @@ const activeItemStyles =
     'text-foreground bg-accent/80 dark:bg-accent dark:text-accent-foreground';
 
 export function AppHeader({ breadcrumbs = [] }: Props) {
-    const { auth } = usePage().props;
-    const items = visibleNavItems(mainNavItems, auth.user?.permissions ?? []);
+    const { auth, empresas } = usePage().props;
+    const navigationItems = mainNavItems(empresas.activa?.slug);
+    const items = visibleNavItems(
+        navigationItems,
+        auth.user?.permissions ?? [],
+        auth.user?.es_superadministrador_plataforma ?? false,
+        empresas.activa?.modulos ?? [],
+    );
     const getInitials = useInitials();
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
 
@@ -95,7 +101,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                     </div>
 
                     <Link
-                        href={mainNavItems[0].href}
+                        href={navigationItems[0].href}
                         prefetch
                         className="flex items-center gap-2"
                     >

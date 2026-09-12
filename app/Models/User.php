@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -27,6 +29,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $avatar
  * @property string|null $avatar_mime_type
  * @property Carbon|null $email_verified_at
+ * @property bool $es_superadministrador_plataforma
  * @property string $password
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
@@ -35,7 +38,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'avatar', 'avatar_mime_type'])]
+#[Fillable(['name', 'email', 'password', 'avatar', 'avatar_mime_type', 'es_superadministrador_plataforma'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -43,6 +46,24 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasFactory, HasRoles, LogsActivity, MustVerifyEmailTrait, Notifiable, TwoFactorAuthenticatable;
 
     protected string $guard_name = 'web';
+
+    /**
+     * @return HasMany<MembresiaEmpresa, $this>
+     */
+    public function membresiasEmpresa(): HasMany
+    {
+        return $this->hasMany(MembresiaEmpresa::class);
+    }
+
+    /**
+     * @return BelongsToMany<Empresa, $this>
+     */
+    public function empresas(): BelongsToMany
+    {
+        return $this->belongsToMany(Empresa::class, 'membresias_empresa')
+            ->withPivot(['estado', 'fecha_incorporacion', 'suspendida_at', 'invitado_por_user_id'])
+            ->withTimestamps();
+    }
 
     /**
      * Queue the branded verification email.
@@ -105,6 +126,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'es_superadministrador_plataforma' => 'boolean',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];

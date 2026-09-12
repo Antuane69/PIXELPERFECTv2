@@ -10,9 +10,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 #[Fillable([
+    'empresa_id',
     'empleado_id',
     'tipo_documento_empleado_id',
     'nombre_original',
@@ -41,6 +43,14 @@ class EmpleadoDocumento extends Model
     }
 
     /**
+     * @return BelongsTo<Empresa, $this>
+     */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
+
+    /**
      * @return BelongsTo<TipoDocumentoEmpleado, $this>
      */
     public function tipoDocumento(): BelongsTo
@@ -53,6 +63,7 @@ class EmpleadoDocumento extends Model
         return LogOptions::defaults()
             ->useLogName('documentos_empleado')
             ->logOnly([
+                'empresa_id',
                 'empleado_id',
                 'tipo_documento_empleado_id',
                 'nombre_original',
@@ -62,6 +73,11 @@ class EmpleadoDocumento extends Model
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $activity->setAttribute('empresa_id', $this->empresa_id);
     }
 
     /**

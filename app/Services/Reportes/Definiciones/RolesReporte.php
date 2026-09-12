@@ -2,6 +2,8 @@
 
 namespace App\Services\Reportes\Definiciones;
 
+use App\Models\Role;
+use App\Services\Empresas\EmpresaContext;
 use App\Services\Reportes\Contracts\ReporteExportable;
 use App\Services\Reportes\ExportConfig;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -9,10 +11,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Spatie\Permission\Models\Role;
 
 class RolesReporte implements ReporteExportable
 {
+    public function __construct(private readonly EmpresaContext $empresaContext) {}
+
     /** @param array<string, mixed> $filtros */
     public function autorizar(Authenticatable $usuario, array $filtros): void
     {
@@ -39,6 +42,7 @@ class RolesReporte implements ReporteExportable
         $search = Str::squish((string) ($filtros['search'] ?? ''));
 
         return Role::query()
+            ->where('empresa_id', $this->empresaContext->empresaRequerida()->id)
             ->select(['id', 'name', 'guard_name'])
             ->where('guard_name', 'web')
             ->with(['permissions' => fn ($query) => $query

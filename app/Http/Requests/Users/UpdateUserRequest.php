@@ -2,12 +2,13 @@
 
 namespace App\Http\Requests\Users;
 
+use App\Models\Empresa;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
-use Spatie\Permission\Models\Role;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -30,33 +31,54 @@ class UpdateUserRequest extends FormRequest
     {
         /** @var User $user */
         $user = $this->route('user');
+        $empresa = $this->route('empresa');
+        $canEditIdentity = $this->user()->es_superadministrador_plataforma;
 
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => [
+            'name' => $canEditIdentity
+                ? ['required', 'string', 'max:255']
+                : ['sometimes', 'string', Rule::in([$user->name])],
+            'email' => $canEditIdentity ? [
                 'required',
                 'string',
                 'email',
                 'max:255',
                 Rule::unique(User::class)->ignore($user),
-            ],
-            'password' => ['nullable', 'string', Password::defaults(), 'confirmed'],
+            ] : ['sometimes', 'string', Rule::in([$user->email])],
+            'password' => $canEditIdentity
+                ? ['nullable', 'string', Password::defaults(), 'confirmed']
+                : ['prohibited'],
             'roles' => ['sometimes', 'array', 'min:1'],
             'roles.*' => [
                 'required',
                 'integer',
                 'distinct',
-                Rule::exists(Role::class, 'id')->where('guard_name', 'web'),
+                Rule::exists(Role::class, 'id')
+                    ->where('guard_name', 'web')
+                    ->where('empresa_id', $empresa instanceof Empresa ? $empresa->id : null),
             ],
         ];
     }
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'name' => str((string) $this->input('name'))->squish()->toString(),
-            'email' => str((string) $this->input('email'))->trim()->lower()->toString(),
-        ]);
+        if ($this->exists('name')) {
+            $this->merge(['name' => $this->string('name')->squish()->toString()]);
+        }
+
+        if ($this->exists('email')) {
+            $this->merge(['email' => $this->string('email')->trim()->lower()->toString()]);
+        }
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'name.in' => 'El nombre debe actualizarlo el titular desde su perfil o un superadministrador de plataforma.',
+            'email.in' => 'El correo debe actualizarlo el titular desde su perfil o un superadministrador de plataforma.',
+            'password.prohibited' => 'La contraseña debe actualizarla el titular desde su perfil o un superadministrador de plataforma.',
+        ];
     }
 
     /**

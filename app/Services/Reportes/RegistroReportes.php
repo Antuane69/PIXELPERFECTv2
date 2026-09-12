@@ -21,6 +21,14 @@ class RegistroReportes
         'usuarios' => UsuariosReporte::class,
     ];
 
+    /** @var array<string, string> */
+    private const MODULOS = [
+        'empleados' => 'empleados',
+        'puestos' => 'puestos',
+        'roles' => 'roles',
+        'usuarios' => 'usuarios',
+    ];
+
     public function __construct(private readonly Container $container) {}
 
     public function obtener(string $reporte): ReporteExportable
@@ -28,5 +36,10 @@ class RegistroReportes
         abort_unless(isset(self::REPORTES[$reporte]), 404, 'Reporte no disponible.');
 
         return $this->container->make(self::REPORTES[$reporte]);
+    }
+
+    public function modulo(string $reporte): ?string
+    {
+        return self::MODULOS[$reporte] ?? null;
     }
 }

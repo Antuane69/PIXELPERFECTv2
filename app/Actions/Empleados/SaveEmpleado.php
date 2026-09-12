@@ -4,6 +4,7 @@ namespace App\Actions\Empleados;
 
 use App\Models\Empleado;
 use App\Models\EmpleadoDocumento;
+use App\Services\Empresas\EmpresaContext;
 use App\Services\ImageCompressor;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -21,6 +22,7 @@ class SaveEmpleado
 
     public function __construct(
         private readonly ImageCompressor $imageCompressor,
+        private readonly EmpresaContext $empresaContext,
     ) {}
 
     /**
@@ -28,6 +30,7 @@ class SaveEmpleado
      */
     public function handle(array $data, ?Empleado $empleado = null): Empleado
     {
+        $empresaId = $this->empresaContext->empresaRequerida()->id;
         $storedFiles = [];
         $obsoleteFiles = [];
 
@@ -35,12 +38,14 @@ class SaveEmpleado
             $savedEmpleado = DB::transaction(function () use (
                 $data,
                 $empleado,
+                $empresaId,
                 &$storedFiles,
                 &$obsoleteFiles,
             ): Empleado {
                 $lockedEmpleado = $empleado?->exists
                     ? Empleado::query()
                         ->whereKey($empleado->getKey())
+                        ->where('empresa_id', $empresaId)
                         ->lockForUpdate()
                         ->firstOrFail()
                     : new Empleado;
@@ -57,13 +62,14 @@ class SaveEmpleado
                     'fecha_inicio_contrato',
                     'fecha_termino_contrato',
                 ]));
+                $lockedEmpleado->setAttribute('empresa_id', $empresaId);
                 $this->applyTrialContractDates($lockedEmpleado);
                 $lockedEmpleado->save();
 
                 if ($avatar instanceof UploadedFile) {
                     $storedAvatar = $this->storeFile(
                         $avatar,
-                        "empleados/{$lockedEmpleado->getKey()}/avatar",
+                        "empresas/{$empresaId}/empleados/{$lockedEmpleado->getKey()}/avatar",
                     );
                     $avatarPath = $storedAvatar['path'];
                     $storedFiles[] = ['disk' => self::PRIVATE_DISK, 'path' => $avatarPath];
@@ -91,6 +97,7 @@ class SaveEmpleado
                     }
 
                     $documento = EmpleadoDocumento::withTrashed()
+                        ->where('empresa_id', $empresaId)
                         ->whereBelongsTo($lockedEmpleado)
                         ->where('tipo_documento_empleado_id', $tipoDocumentoId)
                         ->lockForUpdate()
@@ -108,7 +115,7 @@ class SaveEmpleado
 
                     $storedDocument = $this->storeFile(
                         $archivo,
-                        "empleados/{$lockedEmpleado->getKey()}/documentos",
+                        "empresas/{$empresaId}/empleados/{$lockedEmpleado->getKey()}/documentos",
                     );
                     $newPath = $storedDocument['path'];
                     $storedFiles[] = ['disk' => self::PRIVATE_DISK, 'path' => $newPath];
@@ -122,6 +129,7 @@ class SaveEmpleado
 
                     $documento ??= new EmpleadoDocumento;
                     $documento->fill([
+                        'empresa_id' => $empresaId,
                         'empleado_id' => $lockedEmpleado->getKey(),
                         'tipo_documento_empleado_id' => $tipoDocumentoId,
                         'nombre_original' => $this->safeOriginalName($archivo),

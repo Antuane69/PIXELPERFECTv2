@@ -20,6 +20,7 @@ type FilterValue = string | number | boolean | null | undefined;
 type ResourceExportDialogProps = {
     report: string;
     filters?: Record<string, FilterValue>;
+    exportUrl?: string;
 };
 
 type ExportFormat = 'pdf' | 'xlsx';
@@ -34,6 +35,7 @@ const csrfToken = () =>
 export function ResourceExportDialog({
     report,
     filters = {},
+    exportUrl,
 }: ResourceExportDialogProps) {
     const [open, setOpen] = useState(false);
     const [processingFormat, setProcessingFormat] =
@@ -61,7 +63,7 @@ export function ResourceExportDialog({
                 );
             });
 
-            const response = await fetch(exportar.url(report), {
+            const response = await fetch(exportUrl ?? exportar.url(report), {
                 method: 'POST',
                 headers: {
                     Accept: '*/*',

@@ -4,6 +4,8 @@ namespace Tests\Feature\Management;
 
 use App\Models\Empleado;
 use App\Models\EmpleadoDocumento;
+use App\Models\Empresa;
+use App\Models\MembresiaEmpresa;
 use App\Models\Puesto;
 use App\Models\TipoDocumentoEmpleado;
 use App\Models\User;
@@ -20,12 +22,19 @@ class EmpleadoManagementTest extends TestCase
 
     private User $administrator;
 
+    private Empresa $empresa;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(RolesAndPermissionsSeeder::class);
+        $this->empresa = Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail();
         $this->administrator = User::factory()->create();
+        MembresiaEmpresa::factory()
+            ->for($this->empresa)
+            ->for($this->administrator)
+            ->create();
         $this->administrator->assignRole('Administrador');
     }
 
@@ -33,7 +42,7 @@ class EmpleadoManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $puesto = Puesto::factory()->create();
+        $puesto = Puesto::factory()->for($this->empresa)->create();
         $tipoDocumento = TipoDocumentoEmpleado::factory()->create([
             'nombre' => 'Contrato',
             'es_renovable' => false,
@@ -56,7 +65,8 @@ class EmpleadoManagementTest extends TestCase
             ),
             'vence_el' => null,
         ]];
-        $filteredIndex = route('empleados.index', [
+        $filteredIndex = route('empresas.empleados.index', [
+            'empresa' => $this->empresa,
             'search' => 'Empleado',
             'puesto_id' => $puesto->id,
             'estado_civil' => 'soltero',
@@ -66,7 +76,7 @@ class EmpleadoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($filteredIndex)
-            ->post(route('empleados.store'), $payload)
+            ->post(route('empresas.empleados.store', $this->empresa), $payload)
             ->assertSessionHasNoErrors()
             ->assertRedirect($filteredIndex);
 
@@ -94,7 +104,10 @@ class EmpleadoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($filteredIndex)
-            ->post(route('empleados.update', $empleado), [
+            ->post(route('empresas.empleados.update', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+            ]), [
                 '_method' => 'PUT',
                 'nombre' => 'Empleado Actualizado',
                 'avatar' => UploadedFile::fake()->image('avatar-nuevo.png', 240, 240),
@@ -135,7 +148,10 @@ class EmpleadoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($filteredIndex)
-            ->delete(route('empleados.destroy', $empleado))
+            ->delete(route('empresas.empleados.destroy', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+            ]))
             ->assertSessionHasNoErrors()
             ->assertRedirect($filteredIndex);
 
@@ -146,7 +162,7 @@ class EmpleadoManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $puesto = Puesto::factory()->create();
+        $puesto = Puesto::factory()->for($this->empresa)->create();
         $tipoDocumento = TipoDocumentoEmpleado::factory()->create([
             'documentos_aceptados' => ['JPG'],
             'es_renovable' => false,
@@ -164,9 +180,9 @@ class EmpleadoManagementTest extends TestCase
         ]];
 
         $this->actingAs($this->administrator)
-            ->post(route('empleados.store'), $payload)
+            ->post(route('empresas.empleados.store', $this->empresa), $payload)
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('empleados.index'));
+            ->assertRedirect(route('empresas.empleados.index', $this->empresa));
 
         $documento = EmpleadoDocumento::query()->firstOrFail();
         $storedContents = Storage::disk('local')->get($documento->ruta);
@@ -179,7 +195,7 @@ class EmpleadoManagementTest extends TestCase
 
     public function test_employee_validation_rejects_invalid_identity_data_and_missing_active_documents(): void
     {
-        $puesto = Puesto::factory()->create();
+        $puesto = Puesto::factory()->for($this->empresa)->create();
         TipoDocumentoEmpleado::factory()->create([
             'nombre' => 'Identificación',
             'documentos_aceptados' => ['PDF'],
@@ -195,7 +211,7 @@ class EmpleadoManagementTest extends TestCase
         $payload['fecha_nacimiento'] = now()->subYears(10)->toDateString();
 
         $this->actingAs($this->administrator)
-            ->post(route('empleados.store'), $payload)
+            ->post(route('empresas.empleados.store', $this->empresa), $payload)
             ->assertSessionHasErrors([
                 'correo',
                 'curp',
@@ -211,12 +227,12 @@ class EmpleadoManagementTest extends TestCase
 
     public function test_new_employee_always_starts_with_two_vacation_days(): void
     {
-        $puesto = Puesto::factory()->create();
+        $puesto = Puesto::factory()->for($this->empresa)->create();
         $payload = $this->validEmployeePayload($puesto);
         $payload['dias_vacaciones'] = 30;
 
         $this->actingAs($this->administrator)
-            ->post(route('empleados.store'), $payload)
+            ->post(route('empresas.empleados.store', $this->empresa), $payload)
             ->assertSessionHasNoErrors();
 
         $empleado = Empleado::query()->where('correo', $payload['correo'])->firstOrFail();
@@ -226,12 +242,12 @@ class EmpleadoManagementTest extends TestCase
 
     public function test_employee_validation_rejects_more_than_six_trial_months(): void
     {
-        $puesto = Puesto::factory()->create();
+        $puesto = Puesto::factory()->for($this->empresa)->create();
         $payload = $this->validEmployeePayload($puesto);
         $payload['periodo_prueba_meses'] = 7;
 
         $this->actingAs($this->administrator)
-            ->post(route('empleados.store'), $payload)
+            ->post(route('empresas.empleados.store', $this->empresa), $payload)
             ->assertSessionHasErrors(['periodo_prueba_meses']);
 
         $this->assertDatabaseCount('empleados', 0);
@@ -239,13 +255,13 @@ class EmpleadoManagementTest extends TestCase
 
     public function test_employee_validation_rejects_salary_values_with_more_than_two_decimals(): void
     {
-        $puesto = Puesto::factory()->create();
+        $puesto = Puesto::factory()->for($this->empresa)->create();
         $payload = $this->validEmployeePayload($puesto);
         $payload['salario_dia'] = '10.123';
         $payload['salario_quincena'] = '100.999';
 
         $this->actingAs($this->administrator)
-            ->post(route('empleados.store'), $payload)
+            ->post(route('empresas.empleados.store', $this->empresa), $payload)
             ->assertSessionHasErrors(['salario_dia', 'salario_quincena']);
 
         $this->assertDatabaseCount('empleados', 0);
@@ -255,7 +271,7 @@ class EmpleadoManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $puesto = Puesto::factory()->create();
+        $puesto = Puesto::factory()->for($this->empresa)->create();
         $tipoDocumento = TipoDocumentoEmpleado::factory()->create([
             'es_renovable' => true,
             'frecuencia_cantidad' => 1,
@@ -271,7 +287,7 @@ class EmpleadoManagementTest extends TestCase
         ]];
 
         $this->actingAs($this->administrator)
-            ->post(route('empleados.store'), $payload)
+            ->post(route('empresas.empleados.store', $this->empresa), $payload)
             ->assertSessionHasErrors('documentos.0.vence_el');
 
         $this->assertDatabaseCount('empleados', 0);
@@ -281,8 +297,8 @@ class EmpleadoManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $puesto = Puesto::factory()->create(['nombre' => 'Diseñador']);
-        $otroPuesto = Puesto::factory()->create(['nombre' => 'Contador']);
+        $puesto = Puesto::factory()->for($this->empresa)->create(['nombre' => 'Diseñador']);
+        $otroPuesto = Puesto::factory()->for($this->empresa)->create(['nombre' => 'Contador']);
         $tipoDocumento = TipoDocumentoEmpleado::factory()->create();
         $avatarPath = 'empleados/avatars/needle.png';
         $empleado = Empleado::factory()->create([
@@ -323,7 +339,8 @@ class EmpleadoManagementTest extends TestCase
         ]);
 
         $this->actingAs($this->administrator)
-            ->get(route('empleados.index', [
+            ->get(route('empresas.empleados.index', [
+                'empresa' => $this->empresa,
                 'search' => 'Needle',
                 'puesto_id' => $puesto->id,
                 'estado_civil' => 'soltero',
@@ -336,12 +353,16 @@ class EmpleadoManagementTest extends TestCase
                 ->where('empleados.data.0.id', $empleado->id)
                 ->where(
                     'empleados.data.0.avatar_url',
-                    route('empleados.avatar', $empleado, absolute: false),
+                    route('empresas.empleados.avatar', [
+                        'empresa' => $this->empresa,
+                        'empleado' => $empleado,
+                    ], absolute: false),
                 )
                 ->missing('empleados.data.0.avatar')
                 ->where(
                     'empleados.data.0.documentos.0.download_url',
-                    route('empleados.documentos.download', [
+                    route('empresas.empleados.documentos.download', [
+                        'empresa' => $this->empresa,
                         'empleado' => $empleado,
                         'documento' => $documento,
                     ], absolute: false),
@@ -349,7 +370,8 @@ class EmpleadoManagementTest extends TestCase
                 ->where('empleados.data.0.documentos.0.preview_url', null)
                 ->where(
                     'empleados.data.0.documentos.1.preview_url',
-                    route('empleados.documentos.preview', [
+                    route('empresas.empleados.documentos.preview', [
+                        'empresa' => $this->empresa,
                         'empleado' => $empleado,
                         'documento' => $documentoImagen,
                     ], absolute: false),
@@ -361,7 +383,10 @@ class EmpleadoManagementTest extends TestCase
             );
 
         $this->actingAs($this->administrator)
-            ->get(route('empleados.avatar', $empleado))
+            ->get(route('empresas.empleados.avatar', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+            ]))
             ->assertOk()
             ->assertHeader('content-type', 'image/png')
             ->assertHeader('x-content-type-options', 'nosniff');
@@ -369,7 +394,7 @@ class EmpleadoManagementTest extends TestCase
 
     public function test_employee_pagination_preserves_active_filters_on_the_second_page(): void
     {
-        $puesto = Puesto::factory()->create();
+        $puesto = Puesto::factory()->for($this->empresa)->create();
 
         foreach (range(1, 7) as $index) {
             Empleado::factory()->create([
@@ -380,7 +405,8 @@ class EmpleadoManagementTest extends TestCase
         }
 
         $this->actingAs($this->administrator)
-            ->get(route('empleados.index', [
+            ->get(route('empresas.empleados.index', [
+                'empresa' => $this->empresa,
                 'search' => 'Empleado Paginado',
                 'puesto_id' => $puesto->id,
                 'estado_civil' => 'soltero',
@@ -420,10 +446,15 @@ class EmpleadoManagementTest extends TestCase
         Storage::disk('local')->put($imageDocument->ruta, 'private employee image');
 
         $authorizedUser = User::factory()->create();
+        MembresiaEmpresa::factory()->for($this->empresa)->for($authorizedUser)->create();
         $authorizedUser->givePermissionTo('empleados.view');
 
         $response = $this->actingAs($authorizedUser)
-            ->get(route('empleados.documentos.preview', [$empleado, $imageDocument]))
+            ->get(route('empresas.empleados.documentos.preview', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+                'documento' => $imageDocument,
+            ]))
             ->assertOk()
             ->assertHeader('content-type', 'image/webp')
             ->assertHeader('x-content-type-options', 'nosniff');
@@ -434,23 +465,40 @@ class EmpleadoManagementTest extends TestCase
         );
 
         $this->actingAs($authorizedUser)
-            ->get(route('empleados.documentos.preview', [$otroEmpleado, $imageDocument]))
+            ->get(route('empresas.empleados.documentos.preview', [
+                'empresa' => $this->empresa,
+                'empleado' => $otroEmpleado,
+                'documento' => $imageDocument,
+            ]))
             ->assertNotFound();
 
         $this->actingAs($authorizedUser)
-            ->get(route('empleados.documentos.preview', [$empleado, $pdfDocument]))
+            ->get(route('empresas.empleados.documentos.preview', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+                'documento' => $pdfDocument,
+            ]))
             ->assertNotFound();
 
         $unauthorizedUser = User::factory()->create();
+        MembresiaEmpresa::factory()->for($this->empresa)->for($unauthorizedUser)->create();
 
         $this->actingAs($unauthorizedUser)
-            ->get(route('empleados.documentos.preview', [$empleado, $imageDocument]))
+            ->get(route('empresas.empleados.documentos.preview', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+                'documento' => $imageDocument,
+            ]))
             ->assertForbidden();
 
         Storage::disk('local')->delete($imageDocument->ruta);
 
         $this->actingAs($authorizedUser)
-            ->get(route('empleados.documentos.preview', [$empleado, $imageDocument]))
+            ->get(route('empresas.empleados.documentos.preview', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+                'documento' => $imageDocument,
+            ]))
             ->assertNotFound();
     }
 
@@ -469,27 +517,45 @@ class EmpleadoManagementTest extends TestCase
         Storage::disk('local')->put($documento->ruta, 'private employee document');
 
         $authorizedUser = User::factory()->create();
+        MembresiaEmpresa::factory()->for($this->empresa)->for($authorizedUser)->create();
         $authorizedUser->givePermissionTo('empleados.view');
 
         $this->actingAs($authorizedUser)
-            ->get(route('empleados.documentos.download', [$empleado, $documento]))
+            ->get(route('empresas.empleados.documentos.download', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+                'documento' => $documento,
+            ]))
             ->assertOk()
             ->assertDownload('contrato.pdf');
 
         $this->actingAs($authorizedUser)
-            ->get(route('empleados.documentos.download', [$otroEmpleado, $documento]))
+            ->get(route('empresas.empleados.documentos.download', [
+                'empresa' => $this->empresa,
+                'empleado' => $otroEmpleado,
+                'documento' => $documento,
+            ]))
             ->assertNotFound();
 
         $unauthorizedUser = User::factory()->create();
+        MembresiaEmpresa::factory()->for($this->empresa)->for($unauthorizedUser)->create();
 
         $this->actingAs($unauthorizedUser)
-            ->get(route('empleados.documentos.download', [$empleado, $documento]))
+            ->get(route('empresas.empleados.documentos.download', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+                'documento' => $documento,
+            ]))
             ->assertForbidden();
 
         Storage::disk('local')->delete($documento->ruta);
 
         $this->actingAs($authorizedUser)
-            ->get(route('empleados.documentos.download', [$empleado, $documento]))
+            ->get(route('empresas.empleados.documentos.download', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+                'documento' => $documento,
+            ]))
             ->assertNotFound();
     }
 
@@ -497,11 +563,11 @@ class EmpleadoManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $inactivePuesto = Puesto::factory()->inactive()->create();
+        $inactivePuesto = Puesto::factory()->for($this->empresa)->inactive()->create();
         $payload = $this->validEmployeePayload($inactivePuesto);
 
         $this->actingAs($this->administrator)
-            ->post(route('empleados.store'), $payload)
+            ->post(route('empresas.empleados.store', $this->empresa), $payload)
             ->assertSessionHasErrors('puesto_id');
 
         $existingEmployee = Empleado::factory()->create([
@@ -509,12 +575,15 @@ class EmpleadoManagementTest extends TestCase
         ]);
 
         $this->actingAs($this->administrator)
-            ->put(route('empleados.update', $existingEmployee), [
+            ->put(route('empresas.empleados.update', [
+                'empresa' => $this->empresa,
+                'empleado' => $existingEmployee,
+            ]), [
                 'nombre' => 'Empleado con puesto histórico',
             ])
             ->assertSessionHasNoErrors();
 
-        $activePuesto = Puesto::factory()->create();
+        $activePuesto = Puesto::factory()->for($this->empresa)->create();
         $inactiveDocumentType = TipoDocumentoEmpleado::factory()->inactive()->create([
             'documentos_aceptados' => ['PDF'],
         ]);
@@ -526,24 +595,28 @@ class EmpleadoManagementTest extends TestCase
         ]];
 
         $this->actingAs($this->administrator)
-            ->post(route('empleados.store'), $payload)
+            ->post(route('empresas.empleados.store', $this->empresa), $payload)
             ->assertSessionHasErrors('documentos.0.tipo_documento_empleado_id');
     }
 
     public function test_employee_restore_requires_an_active_position_and_preserves_the_record(): void
     {
-        $puesto = Puesto::factory()->create(['nombre' => 'Puesto histórico']);
+        $puesto = Puesto::factory()->for($this->empresa)->create(['nombre' => 'Puesto histórico']);
         $empleado = Empleado::factory()->create(['puesto_id' => $puesto->id]);
         $empleado->delete();
         $puesto->delete();
-        $archivedIndex = route('empleados.index', [
+        $archivedIndex = route('empresas.empleados.index', [
+            'empresa' => $this->empresa,
             'archivados' => true,
             'search' => $empleado->nombre,
             'page' => 2,
         ]);
 
         $this->actingAs($this->administrator)
-            ->get(route('empleados.index', ['archivados' => true]))
+            ->get(route('empresas.empleados.index', [
+                'empresa' => $this->empresa,
+                'archivados' => true,
+            ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('empleados/index')
@@ -554,19 +627,31 @@ class EmpleadoManagementTest extends TestCase
             );
 
         $this->actingAs($this->administrator)
-            ->from(route('empleados.index', ['archivados' => true]))
-            ->patch(route('empleados.restore', $empleado))
+            ->from(route('empresas.empleados.index', [
+                'empresa' => $this->empresa,
+                'archivados' => true,
+            ]))
+            ->patch(route('empresas.empleados.restore', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+            ]))
             ->assertSessionHasErrors('empleado');
 
         $this->assertSoftDeleted($empleado);
 
         $this->actingAs($this->administrator)
-            ->patch(route('puestos.restore', $puesto))
+            ->patch(route('empresas.puestos.restore', [
+                'empresa' => $this->empresa,
+                'puesto' => $puesto,
+            ]))
             ->assertSessionHasNoErrors();
 
         $this->actingAs($this->administrator)
             ->from($archivedIndex)
-            ->patch(route('empleados.restore', $empleado))
+            ->patch(route('empresas.empleados.restore', [
+                'empresa' => $this->empresa,
+                'empleado' => $empleado,
+            ]))
             ->assertSessionHasNoErrors()
             ->assertRedirect($archivedIndex);
 

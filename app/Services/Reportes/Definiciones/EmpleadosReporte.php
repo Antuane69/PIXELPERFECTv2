@@ -3,6 +3,8 @@
 namespace App\Services\Reportes\Definiciones;
 
 use App\Models\Empleado;
+use App\Models\Puesto;
+use App\Services\Empresas\EmpresaContext;
 use App\Services\Reportes\Contracts\ReporteExportable;
 use App\Services\Reportes\ExportConfig;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -10,9 +12,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class EmpleadosReporte implements ReporteExportable
 {
+    public function __construct(private EmpresaContext $empresaContext) {}
+
     /** @param array<string, mixed> $filtros */
     public function autorizar(Authenticatable $usuario, array $filtros): void
     {
@@ -27,7 +32,12 @@ class EmpleadosReporte implements ReporteExportable
     {
         return Validator::validate($filtros, [
             'search' => ['nullable', 'string', 'max:255'],
-            'puesto_id' => ['nullable', 'integer', 'min:1'],
+            'puesto_id' => [
+                'nullable',
+                'integer',
+                Rule::exists(Puesto::class, 'id')
+                    ->where('empresa_id', $this->empresaContext->empresaRequerida()->id),
+            ],
             'estado_civil' => ['nullable', 'string', 'max:30'],
             'archivados' => ['nullable', 'boolean'],
         ]);
@@ -60,6 +70,7 @@ class EmpleadosReporte implements ReporteExportable
                 'fecha_nacimiento',
                 'deleted_at',
             ])
+            ->where('empresa_id', $this->empresaContext->empresaRequerida()->id)
             ->with('puesto:id,nombre')
             ->when((bool) ($filtros['archivados'] ?? false), fn (Builder $query) => $query->onlyTrashed())
             ->when($search !== '', function (Builder $query) use ($search): void {

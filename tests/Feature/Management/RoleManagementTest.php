@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Management;
 
+use App\Models\Empresa;
+use App\Models\MembresiaEmpresa;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\URL;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class RoleManagementTest extends TestCase
@@ -16,12 +19,17 @@ class RoleManagementTest extends TestCase
 
     private User $administrator;
 
+    private Empresa $empresa;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(RolesAndPermissionsSeeder::class);
+        $this->empresa = Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail();
+        URL::defaults(['empresa' => $this->empresa->slug]);
         $this->administrator = User::factory()->create();
+        MembresiaEmpresa::factory()->for($this->empresa)->for($this->administrator)->create();
         $this->administrator->assignRole('Administrador');
     }
 
@@ -29,7 +37,8 @@ class RoleManagementTest extends TestCase
     {
         $viewPermission = Permission::findByName('users.view', 'web');
         $createPermission = Permission::findByName('users.create', 'web');
-        $filteredIndex = route('roles.index', [
+        $filteredIndex = route('empresas.roles.index', [
+            'empresa' => $this->empresa,
             'search' => 'Supervisor',
             'per_page' => 25,
             'page' => 2,
@@ -37,7 +46,7 @@ class RoleManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($filteredIndex)
-            ->post(route('roles.store'), [
+            ->post(route('empresas.roles.store'), [
                 'name' => '  Supervisor  ',
                 'permissions' => [$viewPermission->id],
             ])
@@ -49,7 +58,7 @@ class RoleManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($filteredIndex)
-            ->put(route('roles.update', $role), [
+            ->put(route('empresas.roles.update', ['role' => $role]), [
                 'name' => 'Supervisor General',
                 'permissions' => [$viewPermission->id, $createPermission->id],
             ])
@@ -67,7 +76,7 @@ class RoleManagementTest extends TestCase
         Role::findOrCreate('Supervisor', 'web');
 
         $this->actingAs($this->administrator)
-            ->post(route('roles.store'), [
+            ->post(route('empresas.roles.store'), [
                 'name' => 'Supervisor',
                 'permissions' => [999999],
             ])
@@ -80,7 +89,7 @@ class RoleManagementTest extends TestCase
         Role::findOrCreate('Other Role', 'web');
 
         $this->actingAs($this->administrator)
-            ->get(route('roles.index', ['search' => 'Needle', 'per_page' => 500]))
+            ->get(route('empresas.roles.index', ['search' => 'Needle', 'per_page' => 500]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('roles/index')
@@ -97,7 +106,7 @@ class RoleManagementTest extends TestCase
         }
 
         $this->actingAs($this->administrator)
-            ->get(route('roles.index', [
+            ->get(route('empresas.roles.index', [
                 'search' => 'Rol Paginado',
                 'per_page' => 5,
                 'page' => 2,
@@ -122,19 +131,19 @@ class RoleManagementTest extends TestCase
         $permission = Permission::findByName('users.view', 'web');
 
         $this->actingAs($this->administrator)
-            ->from(route('roles.index'))
-            ->put(route('roles.update', $administratorRole), [
+            ->from(route('empresas.roles.index'))
+            ->put(route('empresas.roles.update', ['role' => $administratorRole]), [
                 'name' => 'Renamed Administrator',
                 'permissions' => [$permission->id],
             ])
             ->assertSessionHasErrors('role')
-            ->assertRedirect(route('roles.index'));
+            ->assertRedirect(route('empresas.roles.index'));
 
         $this->actingAs($this->administrator)
-            ->from(route('roles.index'))
-            ->delete(route('roles.destroy', $administratorRole))
+            ->from(route('empresas.roles.index'))
+            ->delete(route('empresas.roles.destroy', ['role' => $administratorRole]))
             ->assertSessionHasErrors('role')
-            ->assertRedirect(route('roles.index'));
+            ->assertRedirect(route('empresas.roles.index'));
 
         $this->assertSame('Administrador', $administratorRole->fresh()?->name);
     }
@@ -142,13 +151,15 @@ class RoleManagementTest extends TestCase
     public function test_role_assigned_to_a_user_cannot_be_deleted(): void
     {
         $role = Role::findOrCreate('Operador', 'web');
-        User::factory()->create()->assignRole($role);
+        $user = User::factory()->create();
+        MembresiaEmpresa::factory()->for($this->empresa)->for($user)->create();
+        $user->assignRole($role);
 
         $this->actingAs($this->administrator)
-            ->from(route('roles.index'))
-            ->delete(route('roles.destroy', $role))
+            ->from(route('empresas.roles.index'))
+            ->delete(route('empresas.roles.destroy', ['role' => $role]))
             ->assertSessionHasErrors('role')
-            ->assertRedirect(route('roles.index'));
+            ->assertRedirect(route('empresas.roles.index'));
 
         $this->assertModelExists($role);
     }

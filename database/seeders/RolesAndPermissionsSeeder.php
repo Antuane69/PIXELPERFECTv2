@@ -2,20 +2,30 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Empresas\CrearRolesPredeterminadosEmpresa;
+use App\Models\Empresa;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Contracts\Permission as PermissionContract;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
+    public function __construct(
+        private CrearRolesPredeterminadosEmpresa $crearRolesPredeterminadosEmpresa,
+    ) {}
+
     /**
      * Run the database seeds.
      */
     public function run(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->call([
+            GrupoEmpresarialSeeder::class,
+            EmpresaSeeder::class,
+            ModuloSeeder::class,
+        ]);
 
         $permissionNames = collect([
             'users',
@@ -28,11 +38,16 @@ class RolesAndPermissionsSeeder extends Seeder
             ->merge(['logs.view', 'logs.delete'])
             ->push('users.assign_roles');
 
-        $permissions = $permissionNames->map(
-            static fn (string $permission): PermissionContract => Permission::findOrCreate($permission, 'web'),
+        $permissionNames->each(
+            static fn (string $permission) => Permission::findOrCreate($permission, 'web'),
         );
 
-        Role::findOrCreate('Administrador', 'web')->syncPermissions($permissions);
+        Empresa::query()
+            ->select('id')
+            ->each(fn (Empresa $empresa) => $this->crearRolesPredeterminadosEmpresa->handle($empresa));
+
+        $empresaInicial = Empresa::query()->where('slug', 'pixel-perfect')->first();
+        setPermissionsTeamId($empresaInicial?->id);
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

@@ -12,4 +12,6 @@ export type NavItem = {
     icon?: LucideIcon | null;
     isActive?: boolean;
     permission?: string;
+    module?: string;
+    platformOnly?: boolean;
 };

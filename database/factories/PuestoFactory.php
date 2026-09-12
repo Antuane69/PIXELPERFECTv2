@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Empresa;
 use App\Models\Puesto;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -21,6 +22,7 @@ class PuestoFactory extends Factory
         $salarioDia = fake()->randomFloat(2, 250, 5000);
 
         return [
+            'empresa_id' => Empresa::factory()->activa(),
             'nombre' => Str::of(fake()->unique()->jobTitle())->squish()->limit(255, '')->toString(),
             'salario_dia' => $salarioDia,
             'salario_quincena' => round($salarioDia * 15, 2),

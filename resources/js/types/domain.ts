@@ -78,6 +78,7 @@ export type EmpleadoDocumento = {
 
 export type Empleado = {
     id: number;
+    empresa_id?: number;
     nombre: string;
     nombre_usuario: string;
     correo: string;
@@ -117,7 +118,69 @@ export type Empleado = {
 
 export type DashboardStats = {
     users: number | null;
-    empleados: number | null;
-    puestosActivos: number | null;
     tiposDocumentoActivos: number | null;
+};
+
+export type GrupoEmpresarial = {
+    id: number;
+    nombre: string;
+};
+
+export type Modulo = {
+    id: number;
+    clave: string;
+    nombre: string;
+    descripcion?: string | null;
+};
+
+export type ModuloEmpresa = Modulo & {
+    habilitado: boolean;
+};
+
+export type PlanIconName =
+    | 'ApartmentOutlined'
+    | 'AppstoreOutlined'
+    | 'BankOutlined'
+    | 'BulbOutlined'
+    | 'CloudOutlined'
+    | 'CrownOutlined'
+    | 'DatabaseOutlined'
+    | 'ExperimentOutlined'
+    | 'FireOutlined'
+    | 'GlobalOutlined'
+    | 'HeartOutlined'
+    | 'RocketOutlined'
+    | 'SafetyCertificateOutlined'
+    | 'ShopOutlined'
+    | 'SmileOutlined'
+    | 'StarOutlined'
+    | 'TeamOutlined'
+    | 'ThunderboltOutlined'
+    | 'ToolOutlined'
+    | 'TrophyOutlined';
+
+export type Plan = {
+    id: number;
+    nombre: string;
+    precio_mensual: number | string;
+    color: string;
+    icono: PlanIconName;
+    modulos_incluidos: string | null;
+    limite_usuarios: number | null;
+    periodo_gracia_dias: number;
+    activo: boolean;
+    deleted_at: string | null;
+};
+
+export type EmpresaAdministrada = {
+    id: number;
+    nombre_legal: string;
+    nombre_comercial: string | null;
+    slug: string;
+    estado: 'PROSPECTO' | 'DEMO' | 'ACTIVA' | 'VENCIDA' | 'DESACTIVADA';
+    demo_ends_at: string | null;
+    membresias_count: number;
+    grupo_empresarial: GrupoEmpresarial;
+    modulos: ModuloEmpresa[];
+    created_at: string;
 };

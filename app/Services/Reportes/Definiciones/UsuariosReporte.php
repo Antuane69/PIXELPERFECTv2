@@ -2,7 +2,9 @@
 
 namespace App\Services\Reportes\Definiciones;
 
+use App\EstadoMembresiaEmpresa;
 use App\Models\User;
+use App\Services\Empresas\EmpresaContext;
 use App\Services\Reportes\Contracts\ReporteExportable;
 use App\Services\Reportes\ExportConfig;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -13,6 +15,8 @@ use Illuminate\Support\Str;
 
 class UsuariosReporte implements ReporteExportable
 {
+    public function __construct(private readonly EmpresaContext $empresaContext) {}
+
     /** @param array<string, mixed> $filtros */
     public function autorizar(Authenticatable $usuario, array $filtros): void
     {
@@ -37,8 +41,12 @@ class UsuariosReporte implements ReporteExportable
     public function query(array $filtros): Builder
     {
         $search = Str::squish((string) ($filtros['search'] ?? ''));
+        $empresaId = $this->empresaContext->empresaRequerida()->id;
 
         return User::query()
+            ->whereHas('membresiasEmpresa', fn (Builder $query) => $query
+                ->where('empresa_id', $empresaId)
+                ->where('estado', EstadoMembresiaEmpresa::Activa->value))
             ->select([
                 'id',
                 'name',

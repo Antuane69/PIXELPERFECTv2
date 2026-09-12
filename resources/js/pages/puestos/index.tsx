@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/hooks/use-permissions';
+import { exportar as exportarPuestos } from '@/routes/empresas/reportes/puestos';
 import type { LaravelPaginator, Puesto } from '@/types';
 
 type Props = {
@@ -44,6 +45,12 @@ const money = new Intl.NumberFormat('es-MX', {
 
 export default function PuestosIndex({ puestos, filters }: Props) {
     const { can } = usePermissions();
+    const empresa = usePage().props.empresas.activa;
+
+    if (!empresa) {
+        throw new Error('Empresa activa requerida para administrar puestos.');
+    }
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Puesto | null>(null);
     const [deleting, setDeleting] = useState<Puesto | null>(null);
@@ -116,7 +123,10 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                 <div className="flex justify-end gap-2 md:justify-start">
                     {showingArchived && can('puestos.update') && (
                         <RestoreButton
-                            form={restore.form(puesto.id)}
+                            form={restore.form({
+                                empresa: empresa.slug,
+                                puesto: puesto.id,
+                            })}
                             subject={`el puesto ${puesto.nombre}`}
                         />
                     )}
@@ -160,6 +170,7 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                         <div className="flex flex-wrap gap-2">
                             <ResourceExportDialog
                                 report="puestos"
+                                exportUrl={exportarPuestos.url(empresa.slug)}
                                 filters={{
                                     search: filters?.search,
                                     activo: filters?.activo,
@@ -180,7 +191,7 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                     }
                 />
                 <FiltrosBase
-                    route={index()}
+                    route={index(empresa.slug)}
                     defaultSearch={filters?.search}
                     placeholder="Buscar puesto"
                     facets={filterFacets}
@@ -208,13 +219,17 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                     open={dialogOpen}
                     onOpenChange={setDialogOpen}
                     puesto={editing}
+                    empresaSlug={empresa.slug}
                 />
             )}
             {deleting && (
                 <ConfirmDeleteDialog
                     open
                     onOpenChange={(open) => !open && setDeleting(null)}
-                    form={destroy.form(deleting.id)}
+                    form={destroy.form({
+                        empresa: empresa.slug,
+                        puesto: deleting.id,
+                    })}
                     subject={`el puesto “${deleting.nombre}”`}
                 />
             )}
@@ -226,10 +241,12 @@ function PuestoDialog({
     open,
     onOpenChange,
     puesto,
+    empresaSlug,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     puesto: Puesto | null;
+    empresaSlug: string;
 }) {
     const formId = 'puesto-form';
 
@@ -240,7 +257,14 @@ function PuestoDialog({
             title={puesto ? 'Editar puesto' : 'Nuevo puesto'}
             description="Define el nombre, importes y disponibilidad del puesto."
             formId={formId}
-            form={puesto ? update.form(puesto.id) : store.form()}
+            form={
+                puesto
+                    ? update.form({
+                          empresa: empresaSlug,
+                          puesto: puesto.id,
+                      })
+                    : store.form(empresaSlug)
+            }
             resetOnSuccess={!puesto}
         >
             {(errors) => (
@@ -304,7 +328,3 @@ function PuestoDialog({
         </ResourceFormDialog>
     );
 }
-
-PuestosIndex.layout = {
-    breadcrumbs: [{ title: 'Puestos', href: index() }],
-};

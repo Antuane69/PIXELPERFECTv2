@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Empresa;
+use App\Models\Role;
 use App\Models\User;
 use App\Policies\RolePolicy;
+use App\Services\Empresas\EmpresaContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
@@ -11,9 +14,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Cashier\Cashier;
 use Opcodes\LogViewer\LogFile;
 use Opcodes\LogViewer\LogFolder;
-use Spatie\Permission\Models\Role;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,7 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        Cashier::ignoreRoutes();
+        $this->app->scoped(EmpresaContext::class);
     }
 
     /**
@@ -30,31 +34,33 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Cashier::useCustomerModel(Empresa::class);
+
+        Gate::before(static function (User $user): ?bool {
+            return $user->es_superadministrador_plataforma ? true : null;
+        });
+
         Gate::policy(Role::class, RolePolicy::class);
         Gate::define(
             'viewLogViewer',
-            static fn (User $user): bool => $user->can('logs.view'),
+            static fn (User $user): bool => $user->es_superadministrador_plataforma,
         );
         Gate::define(
             'downloadLogFile',
-            static fn (User $user, LogFile $file): bool => $user->can('logs.view'),
+            static fn (User $user, LogFile $file): bool => $user->es_superadministrador_plataforma,
         );
         Gate::define(
             'downloadLogFolder',
-            static fn (User $user, LogFolder $folder): bool => $user->can('logs.view'),
+            static fn (User $user, LogFolder $folder): bool => $user->es_superadministrador_plataforma,
         );
         Gate::define(
             'deleteLogFile',
-            static fn (User $user, LogFile $file): bool => $user->can('logs.delete'),
+            static fn (User $user, LogFile $file): bool => $user->es_superadministrador_plataforma,
         );
         Gate::define(
             'deleteLogFolder',
-            static fn (User $user, LogFolder $folder): bool => $user->can('logs.delete'),
+            static fn (User $user, LogFolder $folder): bool => $user->es_superadministrador_plataforma,
         );
-        Gate::before(
-            static fn (User $user, string $ability): ?bool => $user->hasRole('Administrador', 'web') ? true : null,
-        );
-
         $this->configureDefaults();
     }
 

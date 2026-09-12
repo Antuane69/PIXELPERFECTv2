@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/hooks/use-permissions';
 import type { LaravelPaginator, ManagedUser, Role } from '@/types';
+import { exportar as exportarUsuarios } from '@/routes/empresas/reportes/usuarios';
 
 type Props = {
     users: LaravelPaginator<ManagedUser>;
@@ -43,6 +44,12 @@ export default function UsersIndex({
     passwordRules,
 }: Props) {
     const { can } = usePermissions();
+    const empresa = usePage().props.empresas.activa;
+
+    if (!empresa) {
+        throw new Error('Empresa activa requerida para administrar usuarios.');
+    }
+
     const canAssignRoles = can('users.assign_roles');
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<ManagedUser | null>(null);
@@ -151,11 +158,12 @@ export default function UsersIndex({
             <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6">
                 <ResourceHeader
                     title="Usuarios"
-                    description="Administra las cuentas, credenciales y roles de acceso."
+                    description="Administra los usuarios y roles de esta empresa."
                     actions={
                         <div className="flex flex-wrap gap-2">
                             <ResourceExportDialog
                                 report="usuarios"
+                                exportUrl={exportarUsuarios.url(empresa.slug)}
                                 filters={{ search: filters?.search }}
                             />
                             {can('users.create') && canAssignRoles && (
@@ -167,7 +175,7 @@ export default function UsersIndex({
                     }
                 />
                 <FiltrosBase
-                    route={index()}
+                    route={index(empresa.slug)}
                     defaultSearch={filters?.search}
                     placeholder="Buscar por nombre o correo"
                     query={{ per_page: filters?.perPage ?? 15 }}
@@ -187,6 +195,7 @@ export default function UsersIndex({
                     onOpenChange={setDialogOpen}
                     user={editing}
                     roles={roles}
+                    empresaSlug={empresa.slug}
                     assignedRoles={assignedRoles}
                     canAssignRoles={canAssignRoles}
                     passwordRules={passwordRules}
@@ -197,7 +206,10 @@ export default function UsersIndex({
                 <ConfirmDeleteDialog
                     open={Boolean(deleting)}
                     onOpenChange={(open) => !open && setDeleting(null)}
-                    form={destroy.form(deleting.id)}
+                    form={destroy.form({
+                        empresa: empresa.slug,
+                        user: deleting.id,
+                    })}
                     subject={`el usuario “${deleting.name}”`}
                 />
             )}
@@ -210,6 +222,7 @@ function UserDialog({
     onOpenChange,
     user,
     roles,
+    empresaSlug,
     assignedRoles,
     canAssignRoles,
     passwordRules,
@@ -218,19 +231,29 @@ function UserDialog({
     onOpenChange: (open: boolean) => void;
     user: ManagedUser | null;
     roles: Role[];
+    empresaSlug: string;
     assignedRoles: Set<string | number>;
     canAssignRoles: boolean;
     passwordRules: string;
 }) {
     const formId = 'user-form';
-    const route = user ? update.form(user.id) : store.form();
+    const { auth } = usePage().props;
+    const canEditIdentity =
+        !user || (auth.user?.es_superadministrador_plataforma ?? false);
+    const route = user
+        ? update.form({ empresa: empresaSlug, user: user.id })
+        : store.form(empresaSlug);
 
     return (
         <ResourceFormDialog
             open={open}
             onOpenChange={onOpenChange}
             title={user ? 'Editar usuario' : 'Nuevo usuario'}
-            description="Asigna los datos de acceso y los roles correspondientes."
+            description={
+                canEditIdentity
+                    ? 'Asigna los datos de acceso y los roles correspondientes.'
+                    : 'Gestiona roles de esta empresa. Nombre, correo y contraseña los actualiza el titular desde su perfil o un superadministrador de plataforma.'
+            }
             formId={formId}
             form={route}
             resetOnSuccess={!user}
@@ -243,6 +266,7 @@ function UserDialog({
                             id="user-name"
                             name="name"
                             defaultValue={user?.name}
+                            readOnly={!canEditIdentity}
                             required
                             autoFocus
                             autoComplete="name"
@@ -256,37 +280,45 @@ function UserDialog({
                             type="email"
                             name="email"
                             defaultValue={user?.email}
+                            readOnly={!canEditIdentity}
                             required
                             autoComplete="email"
                         />
                         <InputError message={errors.email} />
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="user-password">
-                            Contraseña {user ? '(opcional)' : ''}
-                        </Label>
-                        <PasswordStrengthInput
-                            id="user-password"
-                            name="password"
-                            required={!user}
-                            autoComplete="new-password"
-                            passwordrules={passwordRules}
-                        />
-                        <InputError message={errors.password} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="user-password-confirmation">
-                            Confirmar contraseña {user ? '(opcional)' : ''}
-                        </Label>
-                        <PasswordInput
-                            id="user-password-confirmation"
-                            name="password_confirmation"
-                            required={!user}
-                            autoComplete="new-password"
-                            passwordrules={passwordRules}
-                        />
-                        <InputError message={errors.password_confirmation} />
-                    </div>
+                    {canEditIdentity && (
+                        <>
+                            <div className="grid gap-2">
+                                <Label htmlFor="user-password">
+                                    Contraseña {user ? '(opcional)' : ''}
+                                </Label>
+                                <PasswordStrengthInput
+                                    id="user-password"
+                                    name="password"
+                                    required={!user}
+                                    autoComplete="new-password"
+                                    passwordrules={passwordRules}
+                                />
+                                <InputError message={errors.password} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="user-password-confirmation">
+                                    Confirmar contraseña{' '}
+                                    {user ? '(opcional)' : ''}
+                                </Label>
+                                <PasswordInput
+                                    id="user-password-confirmation"
+                                    name="password_confirmation"
+                                    required={!user}
+                                    autoComplete="new-password"
+                                    passwordrules={passwordRules}
+                                />
+                                <InputError
+                                    message={errors.password_confirmation}
+                                />
+                            </div>
+                        </>
+                    )}
                     <fieldset className="grid gap-3 rounded-lg border p-4">
                         <legend className="flex items-center gap-2 px-1 text-sm font-medium">
                             <ShieldCheck className="size-4" /> Roles
@@ -344,7 +376,3 @@ function UserDialog({
         </ResourceFormDialog>
     );
 }
-
-UsersIndex.layout = {
-    breadcrumbs: [{ title: 'Usuarios', href: index() }],
-};

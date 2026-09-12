@@ -20,7 +20,7 @@ class PuestoPolicy
      */
     public function view(User $user, Puesto $puesto): bool
     {
-        return $user->can('puestos.view');
+        return $user->can('puestos.view') && $this->belongsToActiveCompany($puesto);
     }
 
     /**
@@ -36,7 +36,7 @@ class PuestoPolicy
      */
     public function update(User $user, Puesto $puesto): bool
     {
-        return $user->can('puestos.update');
+        return $user->can('puestos.update') && $this->belongsToActiveCompany($puesto);
     }
 
     /**
@@ -44,7 +44,7 @@ class PuestoPolicy
      */
     public function delete(User $user, Puesto $puesto): bool
     {
-        return $user->can('puestos.delete');
+        return $user->can('puestos.delete') && $this->belongsToActiveCompany($puesto);
     }
 
     /**
@@ -52,7 +52,7 @@ class PuestoPolicy
      */
     public function restore(User $user, Puesto $puesto): bool
     {
-        return $user->can('puestos.update');
+        return $user->can('puestos.update') && $this->belongsToActiveCompany($puesto);
     }
 
     /**
@@ -61,5 +61,10 @@ class PuestoPolicy
     public function forceDelete(User $user, Puesto $puesto): bool
     {
         return false;
+    }
+
+    private function belongsToActiveCompany(Puesto $puesto): bool
+    {
+        return (int) getPermissionsTeamId() === $puesto->empresa_id;
     }
 }

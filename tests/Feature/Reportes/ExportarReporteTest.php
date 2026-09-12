@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Reportes;
 
+use App\Models\Empresa;
+use App\Models\MembresiaEmpresa;
 use App\Models\Puesto;
 use App\Models\User;
 use App\Services\Reportes\ExportService;
@@ -19,12 +21,19 @@ class ExportarReporteTest extends TestCase
 
     private User $administrator;
 
+    private Empresa $empresa;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->administrator = User::factory()->create();
+        $this->empresa = Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail();
+        MembresiaEmpresa::factory()
+            ->for($this->empresa)
+            ->for($this->administrator)
+            ->create();
         $this->administrator->assignRole('Administrador');
         Date::setTestNow('2026-08-12 10:00:00');
     }
@@ -45,6 +54,10 @@ class ExportarReporteTest extends TestCase
     public function test_user_without_listing_permission_cannot_export_report(): void
     {
         $user = User::factory()->create();
+        MembresiaEmpresa::factory()
+            ->for(Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail())
+            ->for($user)
+            ->create();
 
         $this->actingAs($user)
             ->post(route('reportes.exportar', 'puestos'), ['formato' => 'xlsx'])
@@ -66,7 +79,7 @@ class ExportarReporteTest extends TestCase
     {
         $this->mock(ExportService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('excelFromQuery')
-                ->times(5)
+                ->times(4)
                 ->andReturnUsing(function (): BinaryFileResponse {
                     $path = tempnam(sys_get_temp_dir(), 'reporte-prueba-');
                     file_put_contents($path, 'xlsx');
@@ -79,7 +92,6 @@ class ExportarReporteTest extends TestCase
             'empleados',
             'puestos',
             'roles',
-            'tipos-documento-empleados',
             'usuarios',
         ] as $reporte) {
             $this->actingAs($this->administrator)
@@ -89,11 +101,32 @@ class ExportarReporteTest extends TestCase
         }
     }
 
+    public function test_platform_administrator_can_request_global_document_type_report(): void
+    {
+        $platformAdministrator = User::factory()->superadministradorPlataforma()->create();
+
+        $this->mock(ExportService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('excelFromQuery')
+                ->once()
+                ->andReturnUsing(function (): BinaryFileResponse {
+                    $path = tempnam(sys_get_temp_dir(), 'reporte-prueba-');
+                    file_put_contents($path, 'xlsx');
+
+                    return response()->download($path, 'reporte.xlsx')->deleteFileAfterSend(true);
+                });
+        });
+
+        $this->actingAs($platformAdministrator)
+            ->post(route('platform.reportes.tipos-documento-empleados.exportar'), ['formato' => 'xlsx'])
+            ->assertOk()
+            ->assertDownload('reporte.xlsx');
+    }
+
     public function test_excel_export_contains_every_filtered_position_not_only_one_page(): void
     {
-        Puesto::factory()->create(['nombre' => 'Needle Activo', 'activo' => true]);
-        Puesto::factory()->inactive()->create(['nombre' => 'Needle Inactivo']);
-        Puesto::factory()->create(['nombre' => 'Otro puesto', 'activo' => true]);
+        Puesto::factory()->for($this->empresa)->create(['nombre' => 'Needle Activo', 'activo' => true]);
+        Puesto::factory()->for($this->empresa)->inactive()->create(['nombre' => 'Needle Inactivo']);
+        Puesto::factory()->for($this->empresa)->create(['nombre' => 'Otro puesto', 'activo' => true]);
 
         $response = $this->actingAs($this->administrator)
             ->post(route('reportes.exportar', 'puestos'), [
@@ -123,7 +156,7 @@ class ExportarReporteTest extends TestCase
 
     public function test_pdf_export_generates_a_download(): void
     {
-        Puesto::factory()->create(['nombre' => 'Puesto PDF']);
+        Puesto::factory()->for($this->empresa)->create(['nombre' => 'Puesto PDF']);
 
         $response = $this->actingAs($this->administrator)
             ->post(route('reportes.exportar', 'puestos'), ['formato' => 'pdf'])

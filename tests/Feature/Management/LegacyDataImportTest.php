@@ -3,6 +3,7 @@
 namespace Tests\Feature\Management;
 
 use App\Models\Empleado;
+use App\Models\Empresa;
 use App\Models\Puesto;
 use App\Models\TipoDocumentoEmpleado;
 use App\Models\User;
@@ -157,7 +158,9 @@ class LegacyDataImportTest extends TestCase
 
     public function test_a_secondary_unique_conflict_fails_and_rolls_back_the_import(): void
     {
-        $existingPosition = Puesto::factory()->create(['nombre' => 'Puesto existente']);
+        $existingPosition = Puesto::factory()
+            ->for(Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail())
+            ->create(['nombre' => 'Puesto existente']);
         $existingEmployee = Empleado::factory()
             ->for($existingPosition)
             ->create(['rfc' => 'GOCG650418AB1']);

@@ -3,6 +3,8 @@
 namespace Tests\Feature\Management;
 
 use App\Models\Empleado;
+use App\Models\Empresa;
+use App\Models\MembresiaEmpresa;
 use App\Models\Puesto;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -16,24 +18,33 @@ class PuestoManagementTest extends TestCase
 
     private User $administrator;
 
+    private Empresa $empresa;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->administrator = User::factory()->create();
+        $this->empresa = Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail();
+        MembresiaEmpresa::factory()
+            ->for($this->empresa)
+            ->for($this->administrator)
+            ->create();
         $this->administrator->assignRole('Administrador');
     }
 
     public function test_administrator_can_create_update_and_soft_delete_a_position(): void
     {
-        $filteredIndex = route('puestos.index', [
+        $filteredIndex = route('empresas.puestos.index', [
+            'empresa' => $this->empresa,
             'search' => 'Desarrollador',
             'activo' => true,
             'per_page' => 25,
             'page' => 2,
         ]);
-        $sourceIndex = route('puestos.index', [
+        $sourceIndex = route('empresas.puestos.index', [
+            'empresa' => $this->empresa,
             'search' => 'Desarrollador',
             'activo' => true,
             'per_page' => 25,
@@ -43,7 +54,7 @@ class PuestoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($sourceIndex)
-            ->post(route('puestos.store'), [
+            ->post(route('empresas.puestos.store', $this->empresa), [
                 'nombre' => 'Desarrollador',
                 'salario_dia' => '750.50',
                 'salario_quincena' => '11257.50',
@@ -56,7 +67,10 @@ class PuestoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($sourceIndex)
-            ->put(route('puestos.update', $puesto), [
+            ->put(route('empresas.puestos.update', [
+                'empresa' => $this->empresa,
+                'puesto' => $puesto,
+            ]), [
                 'nombre' => 'Desarrollador Senior',
                 'salario_dia' => '900.00',
                 'salario_quincena' => null,
@@ -74,7 +88,10 @@ class PuestoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($sourceIndex)
-            ->delete(route('puestos.destroy', $puesto))
+            ->delete(route('empresas.puestos.destroy', [
+                'empresa' => $this->empresa,
+                'puesto' => $puesto,
+            ]))
             ->assertSessionHasNoErrors()
             ->assertRedirect($filteredIndex);
 
@@ -83,10 +100,10 @@ class PuestoManagementTest extends TestCase
 
     public function test_position_validation_rejects_duplicate_name_and_negative_salary(): void
     {
-        Puesto::factory()->create(['nombre' => 'Contador']);
+        Puesto::factory()->for($this->empresa)->create(['nombre' => 'Contador']);
 
         $this->actingAs($this->administrator)
-            ->post(route('puestos.store'), [
+            ->post(route('empresas.puestos.store', $this->empresa), [
                 'nombre' => 'Contador',
                 'salario_dia' => -1,
                 'activo' => 'invalid',
@@ -96,12 +113,13 @@ class PuestoManagementTest extends TestCase
 
     public function test_position_listing_filters_and_caps_page_size(): void
     {
-        Puesto::factory()->create(['nombre' => 'Needle Position', 'activo' => true]);
-        Puesto::factory()->inactive()->create(['nombre' => 'Needle Inactive']);
-        Puesto::factory()->create(['nombre' => 'Other Position', 'activo' => true]);
+        Puesto::factory()->for($this->empresa)->create(['nombre' => 'Needle Position', 'activo' => true]);
+        Puesto::factory()->for($this->empresa)->inactive()->create(['nombre' => 'Needle Inactive']);
+        Puesto::factory()->for($this->empresa)->create(['nombre' => 'Other Position', 'activo' => true]);
 
         $this->actingAs($this->administrator)
-            ->get(route('puestos.index', [
+            ->get(route('empresas.puestos.index', [
+                'empresa' => $this->empresa,
                 'search' => 'Needle',
                 'activo' => true,
                 'per_page' => 500,
@@ -118,14 +136,15 @@ class PuestoManagementTest extends TestCase
     public function test_position_pagination_preserves_active_filters_on_the_second_page(): void
     {
         foreach (range(1, 7) as $index) {
-            Puesto::factory()->create([
+            Puesto::factory()->for($this->empresa)->create([
                 'nombre' => sprintf('Puesto Paginado %02d', $index),
                 'activo' => true,
             ]);
         }
 
         $this->actingAs($this->administrator)
-            ->get(route('puestos.index', [
+            ->get(route('empresas.puestos.index', [
+                'empresa' => $this->empresa,
                 'search' => 'Puesto Paginado',
                 'activo' => true,
                 'per_page' => 5,
@@ -148,31 +167,38 @@ class PuestoManagementTest extends TestCase
 
     public function test_position_assigned_to_an_employee_cannot_be_deleted(): void
     {
-        $puesto = Puesto::factory()->create();
+        $puesto = Puesto::factory()->for($this->empresa)->create();
         Empleado::factory()->create(['puesto_id' => $puesto->id]);
 
         $this->actingAs($this->administrator)
-            ->from(route('puestos.index'))
-            ->delete(route('puestos.destroy', $puesto))
+            ->from(route('empresas.puestos.index', $this->empresa))
+            ->delete(route('empresas.puestos.destroy', [
+                'empresa' => $this->empresa,
+                'puesto' => $puesto,
+            ]))
             ->assertSessionHasErrors('puesto')
-            ->assertRedirect(route('puestos.index'));
+            ->assertRedirect(route('empresas.puestos.index', $this->empresa));
 
         $this->assertNotSoftDeleted($puesto);
     }
 
     public function test_administrator_can_list_and_restore_archived_positions(): void
     {
-        Puesto::factory()->create(['nombre' => 'Puesto vigente']);
-        $archivedPuesto = Puesto::factory()->create(['nombre' => 'Puesto archivado']);
+        Puesto::factory()->for($this->empresa)->create(['nombre' => 'Puesto vigente']);
+        $archivedPuesto = Puesto::factory()->for($this->empresa)->create(['nombre' => 'Puesto archivado']);
         $archivedPuesto->delete();
-        $archivedIndex = route('puestos.index', [
+        $archivedIndex = route('empresas.puestos.index', [
+            'empresa' => $this->empresa,
             'archivados' => true,
             'search' => 'Puesto',
             'page' => 2,
         ]);
 
         $this->actingAs($this->administrator)
-            ->get(route('puestos.index', ['archivados' => true]))
+            ->get(route('empresas.puestos.index', [
+                'empresa' => $this->empresa,
+                'archivados' => true,
+            ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('puestos/index')
@@ -183,7 +209,10 @@ class PuestoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($archivedIndex)
-            ->patch(route('puestos.restore', $archivedPuesto))
+            ->patch(route('empresas.puestos.restore', [
+                'empresa' => $this->empresa,
+                'puesto' => $archivedPuesto,
+            ]))
             ->assertSessionHasNoErrors()
             ->assertRedirect($archivedIndex);
 

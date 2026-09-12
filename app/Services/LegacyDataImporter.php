@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Empresa;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
@@ -48,13 +49,20 @@ class LegacyDataImporter
     public function import(bool $overwrite = false): array
     {
         $this->assertLegacyConnectionIsReady();
+        $empresaId = Empresa::query()
+            ->where('slug', 'pixel-perfect')
+            ->value('id');
 
-        return DB::transaction(function () use ($overwrite): array {
+        if (! is_int($empresaId)) {
+            throw new RuntimeException('No existe la empresa inicial Pixel Perfect para recibir los datos legados.');
+        }
+
+        return DB::transaction(function () use ($empresaId, $overwrite): array {
             $counts = [
                 'Usuarios' => $this->importUsers($overwrite),
-                'Puestos' => $this->importPuestos($overwrite),
+                'Puestos' => $this->importPuestos($empresaId, $overwrite),
                 'Tipos de documento' => $this->importDocumentTypes($overwrite),
-                'Empleados' => $this->importEmployees($overwrite),
+                'Empleados' => $this->importEmployees($empresaId, $overwrite),
             ];
 
             return $counts;
@@ -101,12 +109,15 @@ class LegacyDataImporter
     /**
      * @return array{processed: int, inserted: int, updated: int, skipped: int}
      */
-    private function importPuestos(bool $overwrite): array
+    private function importPuestos(int $empresaId, bool $overwrite): array
     {
-        return $this->importInChunks('puestos', function (array $legacyPuesto) use ($overwrite): string {
+        return $this->importInChunks('puestos', function (array $legacyPuesto) use ($empresaId, $overwrite): string {
             return $this->persist(
                 'puestos',
-                ['nombre' => Str::squish((string) $legacyPuesto['nombre'])],
+                [
+                    'empresa_id' => $empresaId,
+                    'nombre' => Str::squish((string) $legacyPuesto['nombre']),
+                ],
                 [
                     'salario_dia' => $legacyPuesto['salario_dia'] ?? null,
                     'salario_quincena' => $legacyPuesto['salario_quincena'] ?? null,
@@ -169,12 +180,12 @@ class LegacyDataImporter
     /**
      * @return array{processed: int, inserted: int, updated: int, skipped: int}
      */
-    private function importEmployees(bool $overwrite): array
+    private function importEmployees(int $empresaId, bool $overwrite): array
     {
         $hasUsername = Schema::connection('legacy')->hasColumn('empleados', 'nombre_usuario');
         $hasPositionId = Schema::connection('legacy')->hasColumn('empleados', 'puesto_id');
 
-        return $this->importInChunks('empleados', function (array $legacyEmployee) use ($hasPositionId, $hasUsername, $overwrite): string {
+        return $this->importInChunks('empleados', function (array $legacyEmployee) use ($empresaId, $hasPositionId, $hasUsername, $overwrite): string {
             $legacyId = (int) $legacyEmployee['id'];
             $legacyCurp = Str::upper((string) $legacyEmployee['curp']);
             $legacyEmail = $legacyEmployee['correo'] ?? null;
@@ -189,10 +200,14 @@ class LegacyDataImporter
                     ? $legacyPositionName
                     : 'Sin puesto',
             );
-            $positionId = DB::table('puestos')->where('nombre', $positionName)->value('id');
+            $positionId = DB::table('puestos')
+                ->where('empresa_id', $empresaId)
+                ->where('nombre', $positionName)
+                ->value('id');
 
             if ($positionId === null) {
                 $positionId = DB::table('puestos')->insertGetId([
+                    'empresa_id' => $empresaId,
                     'nombre' => $positionName,
                     'salario_dia' => null,
                     'salario_quincena' => null,
@@ -203,6 +218,7 @@ class LegacyDataImporter
             }
 
             $existingUsername = DB::table('empleados')
+                ->where('empresa_id', $empresaId)
                 ->where('curp', $legacyCurp)
                 ->value('nombre_usuario');
             $username = is_string($existingUsername) && $existingUsername !== ''
@@ -211,11 +227,12 @@ class LegacyDataImporter
                     $hasUsername && is_string($legacyUsername) ? $legacyUsername : null,
                     is_string($legacyEmail) ? $legacyEmail : null,
                     $legacyId,
+                    $empresaId,
                 );
 
             return $this->persist(
                 'empleados',
-                ['curp' => $legacyCurp],
+                ['empresa_id' => $empresaId, 'curp' => $legacyCurp],
                 [
                     'nombre' => Str::squish((string) $legacyEmployee['nombre']),
                     'nombre_usuario' => $username,
@@ -343,7 +360,7 @@ class LegacyDataImporter
         );
     }
 
-    private function uniqueUsername(?string $legacyUsername, ?string $email, int $legacyId): string
+    private function uniqueUsername(?string $legacyUsername, ?string $email, int $legacyId, int $empresaId): string
     {
         $base = Str::of((string) ($legacyUsername ?: Str::before((string) $email, '@')))
             ->ascii()
@@ -356,7 +373,10 @@ class LegacyDataImporter
         $candidate = $base;
         $suffix = 1;
 
-        while (DB::table('empleados')->where('nombre_usuario', $candidate)->exists()) {
+        while (DB::table('empleados')
+            ->where('empresa_id', $empresaId)
+            ->where('nombre_usuario', $candidate)
+            ->exists()) {
             $candidate = Str::limit($base, 45, '').'_'.($suffix++);
         }
 

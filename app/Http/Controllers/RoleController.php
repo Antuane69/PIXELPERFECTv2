@@ -4,26 +4,37 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Roles\StoreRoleRequest;
 use App\Http\Requests\Roles\UpdateRoleRequest;
+use App\Models\Empresa;
+use App\Models\Role;
+use App\Services\Empresas\ManageCompanyRoles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
     private const INDEX_QUERY_PARAMETERS = ['search', 'per_page', 'page'];
 
+    private const PERMISOS_EXCLUSIVOS_PLATAFORMA = [
+        'logs.view',
+        'logs.delete',
+        'tipos_documento.view',
+        'tipos_documento.create',
+        'tipos_documento.update',
+        'tipos_documento.delete',
+    ];
+
+    public function __construct(private readonly ManageCompanyRoles $manageRoles) {}
+
     /**
      * Display a paginated role listing.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, Empresa $empresa): Response
     {
         Gate::authorize('viewAny', Role::class);
 
@@ -32,9 +43,11 @@ class RoleController extends Controller
 
         $roles = Role::query()
             ->select(['id', 'name', 'guard_name'])
+            ->where('empresa_id', $empresa->id)
             ->where('guard_name', 'web')
             ->with(['permissions' => fn ($query) => $query
                 ->select(['permissions.id', 'name', 'guard_name'])
+                ->whereNotIn('name', self::PERMISOS_EXCLUSIVOS_PLATAFORMA)
                 ->orderBy('name')])
             ->withCount('users')
             ->when($search !== '', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
@@ -53,8 +66,10 @@ class RoleController extends Controller
             'permissions' => Permission::query()
                 ->select(['id', 'name'])
                 ->where('guard_name', 'web')
+                ->whereNotIn('name', self::PERMISOS_EXCLUSIVOS_PLATAFORMA)
                 ->when(
-                    ! $request->user()?->hasRole('Administrador', 'web'),
+                    ! $request->user()?->es_superadministrador_plataforma
+                        && ! $request->user()?->hasRole('Administrador', 'web'),
                     fn (Builder $query) => $query->whereIn(
                         'id',
                         $request->user()?->getAllPermissions()->pluck('id')->all() ?? [],
@@ -72,77 +87,64 @@ class RoleController extends Controller
     /**
      * Store a newly created role.
      */
-    public function store(StoreRoleRequest $request): RedirectResponse
+    public function store(StoreRoleRequest $request, Empresa $empresa): RedirectResponse
     {
         Gate::authorize('create', Role::class);
 
         $data = $request->validated();
         $permissions = Arr::pull($data, 'permissions');
 
-        DB::transaction(function () use ($data, $permissions): void {
-            $role = Role::query()->create([
-                ...$data,
-                'guard_name' => 'web',
-            ]);
-            $role->syncPermissions($permissions);
-        });
+        $this->manageRoles->save($empresa, $request->user(), $data, $permissions);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Rol creado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'roles.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.roles.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
      * Update the specified role.
      */
-    public function update(UpdateRoleRequest $request, Role $role): RedirectResponse
+    public function update(UpdateRoleRequest $request, Empresa $empresa, Role $role): RedirectResponse
     {
         Gate::authorize('update', $role);
-        $this->ensureRoleIsMutable($role);
 
         $data = $request->validated();
         $permissions = Arr::pull($data, 'permissions');
 
-        DB::transaction(function () use ($role, $data, $permissions): void {
-            $role->update($data);
-            $role->syncPermissions($permissions);
-        });
+        $this->manageRoles->save($empresa, $request->user(), $data, $permissions, $role);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Rol actualizado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'roles.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.roles.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
      * Delete the specified role.
      */
-    public function destroy(Request $request, Role $role): RedirectResponse
+    public function destroy(Request $request, Empresa $empresa, Role $role): RedirectResponse
     {
         Gate::authorize('delete', $role);
-        $this->ensureRoleIsMutable($role);
 
-        if ($role->users()->exists()) {
-            throw ValidationException::withMessages([
-                'role' => 'No puedes eliminar un rol que tiene usuarios asignados.',
-            ]);
-        }
-
-        DB::transaction(static function () use ($role): void {
-            $role->delete();
-        });
+        $this->manageRoles->delete($empresa, $request->user(), $role);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Rol eliminado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'roles.index', self::INDEX_QUERY_PARAMETERS);
-    }
-
-    private function ensureRoleIsMutable(Role $role): void
-    {
-        if ($role->name === 'Administrador') {
-            throw ValidationException::withMessages([
-                'role' => 'El rol Administrador no se puede modificar ni eliminar.',
-            ]);
-        }
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.roles.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     private function perPage(Request $request): int

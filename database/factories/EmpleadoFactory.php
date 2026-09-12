@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Empleado;
+use App\Models\Empresa;
 use App\Models\Puesto;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -30,6 +31,9 @@ class EmpleadoFactory extends Factory
         $salarioDia = fake()->randomFloat(2, 250, 5000);
 
         return [
+            'empresa_id' => fn (): mixed => Empresa::query()
+                ->where('slug', 'pixel-perfect')
+                ->value('id'),
             'nombre' => fake()->name(),
             'nombre_usuario' => Str::lower(Str::limit(fake()->unique()->userName(), 60, '')),
             'correo' => fake()->unique()->safeEmail(),
@@ -39,7 +43,9 @@ class EmpleadoFactory extends Factory
             'rfc' => Str::upper(fake()->unique()->regexify('[A-Z]{4}[0-9]{6}[A-Z0-9]{3}')),
             'nss' => fake()->unique()->numerify('###########'),
             'num_clinica_ss' => 'Clínica '.fake()->numberBetween(1, 200),
-            'puesto_id' => Puesto::factory(),
+            'puesto_id' => fn (array $attributes): mixed => Puesto::factory()->create([
+                'empresa_id' => $attributes['empresa_id'],
+            ])->id,
             'estado_civil' => fake()->randomElement([
                 'soltero',
                 'casado',
@@ -84,8 +90,10 @@ class EmpleadoFactory extends Factory
 
     public function withAvatar(): static
     {
-        return $this->state(fn (array $attributes): array => [
-            'avatar' => 'empleados/avatars/'.Str::uuid().'.webp',
-        ]);
+        return $this->afterCreating(function (Empleado $empleado): void {
+            $empleado->forceFill([
+                'avatar' => "empresas/{$empleado->empresa_id}/empleados/{$empleado->id}/avatar/".Str::uuid().'.webp',
+            ])->saveQuietly();
+        });
     }
 }

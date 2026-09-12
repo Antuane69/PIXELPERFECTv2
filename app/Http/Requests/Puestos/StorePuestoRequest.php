@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Puestos;
 
+use App\Models\Empresa;
 use App\Models\Puesto;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -24,13 +25,16 @@ class StorePuestoRequest extends FormRequest
      */
     public function rules(): array
     {
+        $empresa = $this->route('empresa');
+
         return [
             'nombre' => [
                 'required',
                 'string',
                 'min:2',
                 'max:255',
-                Rule::unique(Puesto::class, 'nombre'),
+                Rule::unique(Puesto::class, 'nombre')
+                    ->where('empresa_id', $empresa instanceof Empresa ? $empresa->id : null),
             ],
             'salario_dia' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'salario_quincena' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],

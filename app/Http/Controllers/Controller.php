@@ -19,7 +19,7 @@ abstract class Controller
         array $fallbackParameters = [],
     ): RedirectResponse {
         $referer = $request->headers->get('referer');
-        $indexPath = parse_url(route($routeName), PHP_URL_PATH);
+        $indexPath = parse_url(route($routeName, $fallbackParameters), PHP_URL_PATH);
         $refererPath = is_string($referer) ? parse_url($referer, PHP_URL_PATH) : null;
 
         if (! is_string($indexPath) || $refererPath !== $indexPath) {
@@ -39,6 +39,6 @@ abstract class Controller
             static fn (mixed $value): bool => is_scalar($value),
         );
 
-        return to_route($routeName, $safeQueryParameters);
+        return to_route($routeName, [...$fallbackParameters, ...$safeQueryParameters]);
     }
 }

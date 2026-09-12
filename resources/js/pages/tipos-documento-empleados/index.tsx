@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { exportarTiposDocumentoEmpleado } from '@/actions/App/Http/Controllers/ExportController';
 import {
     destroy,
     index,
@@ -31,7 +32,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { usePermissions } from '@/hooks/use-permissions';
 import type { LaravelPaginator, TipoDocumentoEmpleado } from '@/types';
 
 type Props = {
@@ -67,7 +67,6 @@ export default function TiposDocumentoIndex({
     tiposDocumento,
     filters,
 }: Props) {
-    const { can } = usePermissions();
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<TipoDocumentoEmpleado | null>(null);
     const [deleting, setDeleting] = useState<TipoDocumentoEmpleado | null>(
@@ -156,13 +155,13 @@ export default function TiposDocumentoIndex({
             className: 'md:w-32',
             cell: (tipo) => (
                 <div className="flex justify-end gap-2 md:justify-start">
-                    {showingArchived && can('tipos_documento.update') && (
+                    {showingArchived && (
                         <RestoreButton
                             form={restore.form(tipo.id)}
                             subject={`el tipo ${tipo.nombre}`}
                         />
                     )}
-                    {!showingArchived && can('tipos_documento.update') && (
+                    {!showingArchived && (
                         <Button
                             size="icon"
                             variant="outline"
@@ -175,7 +174,7 @@ export default function TiposDocumentoIndex({
                             <Pencil />
                         </Button>
                     )}
-                    {!showingArchived && can('tipos_documento.delete') && (
+                    {!showingArchived && (
                         <Button
                             size="icon"
                             variant="outline"
@@ -197,11 +196,12 @@ export default function TiposDocumentoIndex({
             <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6">
                 <ResourceHeader
                     title="Tipos de documento"
-                    description="Configura los documentos requeridos para los expedientes."
+                    description="Catálogo global administrado por plataforma y disponible para todas las empresas."
                     actions={
                         <div className="flex flex-wrap gap-2">
                             <ResourceExportDialog
                                 report="tipos-documento-empleados"
+                                exportUrl={exportarTiposDocumentoEmpleado.url()}
                                 filters={{
                                     search: filters?.search,
                                     activo: filters?.activo,
@@ -209,17 +209,16 @@ export default function TiposDocumentoIndex({
                                     archivados: showingArchived,
                                 }}
                             />
-                            {!showingArchived &&
-                                can('tipos_documento.create') && (
-                                    <Button
-                                        onClick={() => {
-                                            setEditing(null);
-                                            setDialogOpen(true);
-                                        }}
-                                    >
-                                        <Plus /> Nuevo tipo
-                                    </Button>
-                                )}
+                            {!showingArchived && (
+                                <Button
+                                    onClick={() => {
+                                        setEditing(null);
+                                        setDialogOpen(true);
+                                    }}
+                                >
+                                    <Plus /> Nuevo tipo
+                                </Button>
+                            )}
                         </div>
                     }
                 />

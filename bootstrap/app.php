@@ -1,7 +1,11 @@
 <?php
 
+use App\Http\Middleware\EnsureModuleEnabled;
+use App\Http\Middleware\EstablecerEmpresaActiva;
+use App\Http\Middleware\EstablecerEmpresaInicial;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\InicializarContextoPermisos;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -16,6 +20,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Exceptions\BackedEnumCaseNotFoundException;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -29,7 +34,27 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        $middleware->alias([
+            'empresa.activa' => EstablecerEmpresaActiva::class,
+            'empresa.inicial' => EstablecerEmpresaInicial::class,
+            'modulo.habilitado' => EnsureModuleEnabled::class,
+        ]);
+
+        $middleware->prependToPriorityList(
+            SubstituteBindings::class,
+            EstablecerEmpresaActiva::class,
+        );
+        $middleware->prependToPriorityList(
+            SubstituteBindings::class,
+            EstablecerEmpresaInicial::class,
+        );
+        $middleware->prependToPriorityList(
+            [EstablecerEmpresaActiva::class, EstablecerEmpresaInicial::class],
+            InicializarContextoPermisos::class,
+        );
+
         $middleware->web(append: [
+            InicializarContextoPermisos::class,
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

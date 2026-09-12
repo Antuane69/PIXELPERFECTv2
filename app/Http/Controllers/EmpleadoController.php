@@ -9,6 +9,7 @@ use App\Http\Requests\Empleados\StoreEmpleadoRequest;
 use App\Http\Requests\Empleados\UpdateEmpleadoRequest;
 use App\Models\Empleado;
 use App\Models\EmpleadoDocumento;
+use App\Models\Empresa;
 use App\Models\Puesto;
 use App\Models\TipoDocumentoEmpleado;
 use DateTimeInterface;
@@ -39,7 +40,7 @@ class EmpleadoController extends Controller
     /**
      * Display a paginated employee listing.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, Empresa $empresa): Response
     {
         Gate::authorize('viewAny', Empleado::class);
 
@@ -50,6 +51,7 @@ class EmpleadoController extends Controller
         $empleados = Empleado::query()
             ->select([
                 'id',
+                'empresa_id',
                 'nombre',
                 'nombre_usuario',
                 'correo',
@@ -84,11 +86,15 @@ class EmpleadoController extends Controller
                 'updated_at',
                 'deleted_at',
             ])
+            ->whereBelongsTo($empresa)
             ->with([
+                'empresa:id,slug',
                 'puesto:id,nombre',
                 'documentos' => fn ($query) => $query
+                    ->where('empresa_id', $empresa->id)
                     ->select([
                         'id',
+                        'empresa_id',
                         'empleado_id',
                         'tipo_documento_empleado_id',
                         'nombre_original',
@@ -132,6 +138,7 @@ class EmpleadoController extends Controller
             'empleados' => $empleados,
             'puestos' => Puesto::query()
                 ->select(['id', 'nombre', 'salario_dia', 'salario_quincena', 'activo'])
+                ->where('empresa_id', getPermissionsTeamId())
                 ->orderBy('nombre')
                 ->get(),
             'tiposDocumento' => TipoDocumentoEmpleado::query()
@@ -159,7 +166,7 @@ class EmpleadoController extends Controller
     /**
      * Store a newly created employee and its files.
      */
-    public function store(StoreEmpleadoRequest $request): RedirectResponse
+    public function store(StoreEmpleadoRequest $request, Empresa $empresa): RedirectResponse
     {
         Gate::authorize('create', Empleado::class);
 
@@ -167,13 +174,18 @@ class EmpleadoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Empleado creado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'empleados.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.empleados.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
      * Restore the specified archived employee and its private records.
      */
-    public function restore(Request $request, Empleado $empleado): RedirectResponse
+    public function restore(Request $request, Empresa $empresa, Empleado $empleado): RedirectResponse
     {
         Gate::authorize('restore', $empleado);
 
@@ -183,16 +195,16 @@ class EmpleadoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'empleados.index',
+            'empresas.empleados.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['archivados' => true],
+            ['empresa' => $empresa, 'archivados' => true],
         );
     }
 
     /**
      * Update the specified employee and its files.
      */
-    public function update(UpdateEmpleadoRequest $request, Empleado $empleado): RedirectResponse
+    public function update(UpdateEmpleadoRequest $request, Empresa $empresa, Empleado $empleado): RedirectResponse
     {
         Gate::authorize('update', $empleado);
 
@@ -203,13 +215,18 @@ class EmpleadoController extends Controller
             'message' => 'Empleado actualizado correctamente.',
         ]);
 
-        return $this->redirectToResourceIndex($request, 'empleados.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.empleados.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
      * Soft delete the specified employee while preserving its private records.
      */
-    public function destroy(Request $request, Empleado $empleado): RedirectResponse
+    public function destroy(Request $request, Empresa $empresa, Empleado $empleado): RedirectResponse
     {
         Gate::authorize('delete', $empleado);
 
@@ -217,7 +234,12 @@ class EmpleadoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Empleado eliminado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'empleados.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.empleados.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
@@ -241,7 +263,10 @@ class EmpleadoController extends Controller
             'telefono' => $empleado->telefono,
             'avatar_url' => $empleado->trashed() || $empleado->avatar === null
                 ? null
-                : route('empleados.avatar', $empleado, absolute: false),
+                : route('empresas.empleados.avatar', [
+                    'empresa' => $empleado->empresa,
+                    'empleado' => $empleado,
+                ], absolute: false),
             'salario_dia' => $this->decimal($empleado->salario_dia),
             'salario_quincena' => $this->decimal($empleado->salario_quincena),
             'salario_vacaciones_finiquito' => $this->decimal($empleado->salario_vacaciones_finiquito),
@@ -277,13 +302,15 @@ class EmpleadoController extends Controller
                     'vence_el' => $this->date($documento->vence_el),
                     'preview_url' => $empleado->trashed() || ! str_starts_with($documento->mime_type, 'image/')
                         ? null
-                        : route('empleados.documentos.preview', [
+                        : route('empresas.empleados.documentos.preview', [
+                            'empresa' => $empleado->empresa,
                             'empleado' => $empleado,
                             'documento' => $documento,
                         ], absolute: false),
                     'download_url' => $empleado->trashed()
                         ? null
-                        : route('empleados.documentos.download', [
+                        : route('empresas.empleados.documentos.download', [
+                            'empresa' => $empleado->empresa,
                             'empleado' => $empleado,
                             'documento' => $documento,
                         ], absolute: false),

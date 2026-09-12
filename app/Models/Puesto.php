@@ -6,12 +6,14 @@ use Database\Factories\PuestoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-#[Fillable(['nombre', 'salario_dia', 'salario_quincena', 'activo'])]
+#[Fillable(['empresa_id', 'nombre', 'salario_dia', 'salario_quincena', 'activo'])]
 class Puesto extends Model
 {
     /** @use HasFactory<PuestoFactory> */
@@ -20,6 +22,14 @@ class Puesto extends Model
     protected $attributes = [
         'activo' => true,
     ];
+
+    /**
+     * @return BelongsTo<Empresa, $this>
+     */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 
     /**
      * @return HasMany<Empleado, $this>
@@ -33,9 +43,14 @@ class Puesto extends Model
     {
         return LogOptions::defaults()
             ->useLogName('puestos')
-            ->logOnly(['nombre', 'salario_dia', 'salario_quincena', 'activo'])
+            ->logOnly(['empresa_id', 'nombre', 'salario_dia', 'salario_quincena', 'activo'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $activity->setAttribute('empresa_id', $this->empresa_id);
     }
 
     /**

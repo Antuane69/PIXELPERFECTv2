@@ -5,7 +5,9 @@ export type User = {
     avatar: string | null;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
+    roles?: string[];
     permissions?: string[];
+    es_superadministrador_plataforma: boolean;
     created_at: string;
     updated_at: string;
     [key: string]: unknown;
@@ -13,6 +15,26 @@ export type User = {
 
 export type Auth = {
     user: User | null;
+};
+
+export type EmpresaResumen = {
+    id: number;
+    nombre: string;
+    nombre_legal: string;
+    slug: string;
+    estado: string;
+    modulos?: string[];
+    puede_acceder?: boolean;
+    grupo?: {
+        id: number;
+        nombre: string;
+        slug: string;
+    } | null;
+};
+
+export type EmpresasCompartidas = {
+    activa: EmpresaResumen | null;
+    disponibles: EmpresaResumen[];
 };
 
 /* @chisel-passkeys */

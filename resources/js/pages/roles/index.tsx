@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { LockKeyhole, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/hooks/use-permissions';
 import type { LaravelPaginator, Permission, Role } from '@/types';
+import { exportar as exportarRoles } from '@/routes/empresas/reportes/roles';
 
 type Props = {
     roles: LaravelPaginator<Role>;
@@ -38,6 +39,12 @@ const isAdministrator = (role: Role) =>
 
 export default function RolesIndex({ roles, permissions, filters }: Props) {
     const { can } = usePermissions();
+    const empresa = usePage().props.empresas.activa;
+
+    if (!empresa) {
+        throw new Error('Empresa activa requerida para administrar roles.');
+    }
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Role | null>(null);
     const [deleting, setDeleting] = useState<Role | null>(null);
@@ -135,6 +142,7 @@ export default function RolesIndex({ roles, permissions, filters }: Props) {
                         <div className="flex flex-wrap gap-2">
                             <ResourceExportDialog
                                 report="roles"
+                                exportUrl={exportarRoles.url(empresa.slug)}
                                 filters={{ search: filters?.search }}
                             />
                             {can('roles.create') && (
@@ -151,7 +159,7 @@ export default function RolesIndex({ roles, permissions, filters }: Props) {
                     }
                 />
                 <FiltrosBase
-                    route={index()}
+                    route={index(empresa.slug)}
                     defaultSearch={filters?.search}
                     placeholder="Buscar rol"
                     query={{ per_page: filters?.perPage ?? 15 }}
@@ -171,13 +179,17 @@ export default function RolesIndex({ roles, permissions, filters }: Props) {
                     onOpenChange={setDialogOpen}
                     role={editing}
                     permissions={permissions}
+                    empresaSlug={empresa.slug}
                 />
             )}
             {deleting && (
                 <ConfirmDeleteDialog
                     open
                     onOpenChange={(open) => !open && setDeleting(null)}
-                    form={destroy.form(deleting.id)}
+                    form={destroy.form({
+                        empresa: empresa.slug,
+                        role: deleting.id,
+                    })}
                     subject={`el rol “${deleting.name}”`}
                 />
             )}
@@ -190,11 +202,13 @@ function RoleDialog({
     onOpenChange,
     role,
     permissions,
+    empresaSlug,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     role: Role | null;
     permissions: Permission[];
+    empresaSlug: string;
 }) {
     const formId = 'role-form';
     const assigned = new Set(
@@ -210,7 +224,11 @@ function RoleDialog({
             title={role ? 'Editar rol' : 'Nuevo rol'}
             description="Selecciona únicamente los permisos necesarios."
             formId={formId}
-            form={role ? update.form(role.id) : store.form()}
+            form={
+                role
+                    ? update.form({ empresa: empresaSlug, role: role.id })
+                    : store.form(empresaSlug)
+            }
             resetOnSuccess={!role}
             className="sm:max-w-3xl"
         >
@@ -258,7 +276,3 @@ function RoleDialog({
         </ResourceFormDialog>
     );
 }
-
-RolesIndex.layout = {
-    breadcrumbs: [{ title: 'Roles', href: index() }],
-};

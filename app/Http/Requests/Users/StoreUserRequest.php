@@ -2,12 +2,13 @@
 
 namespace App\Http\Requests\Users;
 
+use App\Models\Empresa;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
-use Spatie\Permission\Models\Role;
 
 class StoreUserRequest extends FormRequest
 {
@@ -26,6 +27,8 @@ class StoreUserRequest extends FormRequest
      */
     public function rules(): array
     {
+        $empresa = $this->route('empresa');
+
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique(User::class)],
@@ -35,7 +38,9 @@ class StoreUserRequest extends FormRequest
                 'required',
                 'integer',
                 'distinct',
-                Rule::exists(Role::class, 'id')->where('guard_name', 'web'),
+                Rule::exists(Role::class, 'id')
+                    ->where('guard_name', 'web')
+                    ->where('empresa_id', $empresa instanceof Empresa ? $empresa->id : null),
             ],
         ];
     }

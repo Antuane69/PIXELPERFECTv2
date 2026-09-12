@@ -6,6 +6,50 @@ Este documento define dirección, alcance, decisiones y orden de implementación
 
 Debe usarse como contrato de contexto en futuras conversaciones. Cada fase debe completarse y verificarse antes de iniciar siguiente. No construir módulos nuevos sobre datos empresariales hasta comprobar aislamiento multiempresa.
 
+## Último punto seguro de reanudación
+
+Actualizado: 10 de septiembre de 2026.
+
+- Última fase cerrada: **Fase 6 — Catálogos globales e híbridos**.
+- Fase actual: **Fase 7 — Módulos, planes y límites**. Núcleo de módulos, habilitación empresarial y catálogo configurable de planes completados; asignación plan-módulo y enforcement de límites permanecen pendientes.
+- Próximo bloque exacto: confirmar matriz plan-módulo, asignación de plan a empresa, cuotas medibles y precedencia de overrides. Catálogo permite capturar precio, límite opcional y módulos descriptivos sin aplicar reglas no confirmadas.
+- `Puestos` y sus salarios fueron confirmados como datos propios de cada empresa, no como catálogo compartido por grupo.
+- Una misma persona puede tener expedientes independientes en varias empresas; nombre de usuario, correo, CURP, RFC y NSS son únicos solamente dentro de cada empresa.
+- Catálogo grupal o extensiones empresariales de tipos de documento quedan diferidos hasta confirmar necesidad real; no existe implementación híbrida accidental.
+- Invitaciones empresariales continúan fuera de alcance porque contrato de incorporación no está confirmado.
+- Superadministrador de plataforma tiene acceso directo explícito a todas empresas, incluso sin membresía; decisión confirmada por propietario el 5 de septiembre de 2026. Impersonación y auditoría detallada quedan para portal operativo.
+- Migraciones nuevas fueron probadas con base limpia de testing. Falta ejecutar `php artisan migrate` en cada entorno real durante despliegue controlado.
+- Advertencia local: durante verificación, `php artisan migrate:fresh --env=testing --force` apuntó a MySQL local y reconstruyó esa base. Esquema y datos semilla fueron restaurados con `migrate` + `db:seed`; datos locales anteriores, si existían, no pudieron recuperarse desde proyecto.
+
+Verificación del corte:
+
+- `composer ci:check`: **210 pruebas, 1562 aserciones, PHPStan, Pint, ESLint, Prettier y TypeScript correctos**.
+- `npm run build`: **correcto**.
+- Pruebas multiempresa nuevas: núcleo Empresa, Teams, roles/permisos por empresa, catálogos globales, módulos/entitlements, bindings cruzados, formularios manipulados, superadministrador global, reinicio de contexto y aislamiento de Puestos, salarios, Empleados, documentos, archivos, dashboard y exportación.
+
+Implementación disponible:
+
+- tablas `grupos_empresariales`, `empresas` y `membresias_empresa` con claves, índices y unicidad;
+- enums de estado empresarial, membresía y tipo de grupo;
+- flag no asignable desde UI `es_superadministrador_plataforma`;
+- creación transaccional de empresa y grupo exclusivo, con opción de grupo existente;
+- seeders idempotentes para grupo/empresa inicial Pixel Perfect y membresía del superadministrador;
+- contexto request-scoped `EmpresaContext` y middleware `empresa.activa`;
+- Teams de Spatie Permission mediante `empresa_id`, rol `Administrador` protegido por empresa y backfill del tenant inicial;
+- rutas separadas `/admin/empresas` y `/app/{empresa:slug}`, incluyendo usuarios y roles empresariales;
+- portal inicial de empresas con búsqueda, filtros y paginación;
+- selector de empresa y props Inertia tipadas;
+- usuario global con membresías y roles independientes; retirar usuario de empresa no elimina identidad global;
+- superadministrador separado por flag, con bypass explícito no asignable desde UI empresarial;
+- permisos de plataforma excluidos de roles empresariales;
+- reinicio de contexto en cada request para evitar fuga de cache/permisos;
+- Puestos y salarios aislados por empresa mediante rutas, bindings, policies, validación, consultas, dashboard, exportación y restricción única compuesta;
+- Empleados y documentos aislados por empresa mediante claves foráneas compuestas, unicidades empresariales, rutas privadas, policies, validación, acciones transaccionales, activity log, dashboard y exportación;
+- archivos nuevos de empleados almacenados bajo `empresas/{empresa_id}/empleados/{empleado_id}/...`; rutas heredadas permitidas solamente para empresa inicial;
+- catálogo `Tipos de documento de empleados` clasificado como global: lectura empresarial para expedientes y administración/exportación exclusiva de plataforma;
+- catálogo global de módulos con `usuarios`, `roles`, `puestos` y `empleados`, habilitación por empresa, middleware, navegación, dashboard, configuración de plataforma y activity log de overrides;
+- deshabilitar módulo conserva datos y no sustituye permisos: empresa, módulo, permiso y pertenencia siguen siendo controles independientes.
+
 ## Visión del producto
 
 Pixel Perfect será una sola plataforma centralizada, administrada por propietario del sistema, donde varias empresas podrán contratar acceso mensual.
@@ -48,9 +92,11 @@ Propietario de plataforma podrá:
 - Un usuario podrá pertenecer a una o varias empresas mediante membresías.
 - Pertenecer a empresa dentro de grupo no concede acceso a otras empresas del mismo grupo.
 - Grupo comparte catálogos autorizados, no empleados, usuarios, documentos ni registros operativos.
+- Puestos y salarios pertenecen a empresa; empresas del mismo grupo no los comparten.
 - Rol dentro de una empresa no otorga acceso a otras empresas.
 - Separar completamente `Superadministrador de plataforma` y `Administrador de empresa`.
 - Superadministrador de plataforma no será asignable desde UI empresarial.
+- Superadministrador de plataforma accede directamente a cualquier empresa sin membresía durante MVP.
 - Permisos describen acciones; membresía define empresa; plan define módulos disponibles.
 
 ### Reglas actuales conservadas
@@ -279,6 +325,10 @@ Reglas:
 - contratar módulo no concede automáticamente permisos;
 - suscripción pertenece a empresa, no a usuario individual.
 - proveedor de cobro elegido: Stripe mediante Laravel Cashier;
+- empresa es modelo facturable de Cashier; usuarios individuales no reciben columnas ni suscripciones Stripe;
+- catálogo de planes es global, exclusivo del superadministrador y conserva archivados;
+- plan configura nombre, precio mensual MXN, color, icono, descripción libre de módulos, límite opcional de usuarios y días de gracia;
+- no existe prueba gratuita; periodo de gracia inicial es 15 días y puede configurarse por plan;
 - estado empresarial será estado normalizado interno, no copia directa de estado Stripe;
 - webhooks Stripe actualizarán suscripción y solicitarán transiciones idempotentes;
 - facturación fiscal se investigará cerca de preproducción.
@@ -300,7 +350,7 @@ Reglas:
 - invitaciones;
 - roles;
 - empleados;
-- salarios;
+- puestos y salarios del catálogo laboral;
 - documentos;
 - preferencias empresariales;
 - flujos internos;
@@ -315,7 +365,7 @@ Reglas:
 
 Cada tabla de catálogo compartido debe tener `grupo_empresarial_id` obligatorio. Empresa independiente usa grupo exclusivo, evitando condiciones especiales o `empresa_id` nullable.
 
-Pertenecer al mismo grupo sólo concede visibilidad del catálogo. Permiso para editar contenido compartido requiere regla separada, porque cambio afecta varias empresas.
+Pertenecer al mismo grupo sólo concede visibilidad de catálogos expresamente clasificados como grupales. Puestos y salarios quedan excluidos. Permiso para editar contenido compartido requiere regla separada, porque cambio afecta varias empresas.
 
 ### Híbridos global-grupo
 
@@ -429,7 +479,7 @@ Criterio de salida alcanzado:
 
 ### Fase 2 — Núcleo Empresa y contexto activo
 
-Estado: pendiente.
+Estado: completada el 4 de septiembre de 2026.
 
 Objetivo: introducir frontera empresarial sin migrar todavía todos los módulos.
 
@@ -471,9 +521,25 @@ Criterio de salida:
 
 - contexto empresarial estable y probado, todavía sin confiar en él para todos los datos existentes.
 
+Resultado:
+
+- [x] modelos, migraciones, factories y seeders de grupo, empresa y membresía;
+- [x] relación obligatoria empresa-grupo y alta transaccional de grupo exclusivo;
+- [x] alta de empresas reservada al superadministrador de plataforma;
+- [x] empresa inicial Pixel Perfect y membresía inicial idempotentes;
+- [x] resolución por `{empresa:slug}` y contexto request-scoped;
+- [x] membresía activa y estado empresarial comprobados por middleware;
+- [x] empresa, grupo derivado y empresas disponibles compartidos mediante Inertia;
+- [x] selector de empresa y portal de plataforma separados;
+- [x] respuestas probadas para empresa inexistente, usuario ajeno, membresía suspendida, empresa vencida y demo expirada;
+- [x] aislamiento probado entre empresas del mismo grupo;
+- [ ] invitaciones: `No verificable`; contrato pendiente, por tanto no forman parte del cierre técnico de esta fase.
+
+Límite intencional al cerrar Fase 2: rutas de usuarios, roles, puestos, tipos de documento, empleados y reportes permanecían monoempresa. Usuarios y roles fueron migrados en Fase 3; módulos restantes están cercados a empresa inicial y no se exponen a otro tenant.
+
 ### Fase 3 — Autorización por empresa
 
-Estado: pendiente.
+Estado: completada el 5 de septiembre de 2026.
 
 Objetivo: separar privilegios de plataforma y empresa.
 
@@ -503,73 +569,116 @@ Criterio de salida:
 
 - ninguna policy empresarial depende de rol global `Administrador`.
 
-### Fase 4 — Piloto de catálogo por grupo
+Resultado:
 
-Estado: pendiente.
+- [x] Teams de Spatie Permission activado con `empresa_id`;
+- [x] rol modelo propio y roles `Administrador` protegidos por empresa;
+- [x] migración compatible para instalaciones existentes y frescas;
+- [x] roles, asignaciones y usuarios existentes trasladados a empresa inicial mediante backfill;
+- [x] administración de usuarios y roles movida a `/app/{empresa:slug}/...` con scoped bindings;
+- [x] listados, validación de IDs, mutaciones y redirecciones limitados a empresa activa;
+- [x] administrador de empresa no puede conceder permisos de plataforma ni operar otra empresa;
+- [x] retiro de usuario elimina membresía/roles empresariales, no identidad global;
+- [x] último administrador protegido por empresa, incluso al eliminar perfil global;
+- [x] contexto de permisos y relaciones reiniciado en cada request;
+- [x] props Inertia y navegación responden a empresa activa;
+- [x] superadministrador de plataforma separado por flag, acceso global explícito y wildcard frontend;
+- [x] módulos no migrados cercados a empresa inicial para impedir exposición accidental;
+- [x] criterio de salida alcanzado: ninguna policy empresarial depende de rol global `Administrador`.
 
-Objetivo: validar aislamiento y compartición de catálogos usando un módulo simple. Usar `Puestos` solamente si se confirma como catálogo compartido por grupo; de lo contrario, elegir el primer catálogo grupal confirmado.
+Pendiente fuera del cierre:
+
+- [ ] invitación o incorporación de identidad global ya existente a otra empresa: `No verificable`;
+- [ ] bitácora e impersonación opcional para sesiones de soporte: se implementarán en Fase 9.
+
+### Fase 4 — Piloto de catálogo empresarial: Puestos
+
+Estado: completada el 8 de septiembre de 2026.
+
+Decisión confirmada: cada empresa crea y administra su propio catálogo de Puestos y sus salarios. Empresas del mismo grupo no comparten este catálogo.
+
+Objetivo: validar aislamiento empresarial con un módulo simple antes de migrar Empleados. Piloto de catálogo grupal se difiere hasta identificar un catálogo realmente compartido.
 
 Alcance:
 
-- agregar `grupo_empresarial_id` al catálogo piloto;
-- asignar registros existentes al grupo inicial de Pixel Perfect;
-- cambiar nombre único global a único por grupo;
-- aplicar scope por grupo derivado de empresa activa;
+- agregar `empresa_id` obligatorio al catálogo piloto;
+- asignar registros existentes a empresa inicial Pixel Perfect;
+- cambiar nombre único global a único por empresa;
+- aplicar scope por empresa activa;
 - adaptar routes, binding, policy, requests, controller, reportes y UI;
 - preservar filtros, archivado y paginación;
 - adaptar factory y seeder;
 - mantener redirecciones dentro de empresa activa;
-- aplicar regla confirmada sobre quién puede modificar catálogos compartidos.
+- permitir modificación según permisos empresariales existentes.
 
 Pruebas mínimas:
 
-- empresas del mismo grupo ven los mismos registros del catálogo;
-- una modificación autorizada queda visible para todas las empresas del grupo;
-- grupos distintos pueden tener registros con mismo nombre;
-- usuario de grupo A no lista, actualiza, elimina ni restaura registros de grupo B;
-- IDs manipulados no cruzan grupo;
-- búsqueda, filtro, archivado, exportación y paginación permanecen aislados por grupo;
-- compartir catálogo no permite consultar empleados ni otros datos operativos de otra empresa del grupo;
-- dashboard cuenta registros visibles para grupo de empresa activa;
+- empresas del mismo grupo mantienen registros y salarios separados;
+- empresas distintas pueden tener puestos con mismo nombre y salarios diferentes;
+- usuario de empresa A no lista, actualiza, elimina ni restaura registros de empresa B;
+- IDs y `empresa_id` manipulados no cruzan empresa;
+- búsqueda, filtro, archivado, exportación y paginación permanecen aislados por empresa;
+- dashboard cuenta registros visibles para empresa activa;
 - superadministrador usa acceso global solamente desde flujo explícito.
 
 Criterio de salida:
 
-- patrón queda aprobado como referencia para catálogos compartidos por grupo.
+- patrón queda aprobado como referencia para catálogos propios de empresa.
+
+Resultado:
+
+- [x] columna `empresa_id` obligatoria, foreign key restrictiva e índice único `empresa_id + nombre`;
+- [x] backfill de puestos existentes a empresa inicial Pixel Perfect mediante migración separada;
+- [x] relación Empresa-Puestos y factory válida;
+- [x] rutas movidas a `/app/{empresa:slug}/puestos` con scoped bindings, archivado y restauración;
+- [x] listado, CRUD, policy, Form Requests y redirecciones limitados a empresa activa;
+- [x] navegación y Wayfinder adaptados para cualquier empresa;
+- [x] dashboard empresarial cuenta solamente puestos activos propios;
+- [x] exportación empresarial incluye solamente puestos propios;
+- [x] importador legado asigna puestos a empresa inicial y resuelve nombres dentro de esa empresa;
+- [x] Empleados todavía cercados a empresa inicial solamente pueden seleccionar puestos de esa empresa;
+- [x] pruebas cruzadas cubren empresas del mismo grupo, mismo nombre, salarios distintos, IDs manipulados, falta de permiso, dashboard y exportación;
+- [x] `composer ci:check`: 180 pruebas, 1292 aserciones y todos los controles correctos;
+- [x] `npm run build`: correcto.
 
 ### Fase 5 — Empleados y documentos
 
-Estado: pendiente.
+Estado: completada el 10 de septiembre de 2026.
+
+Decisión confirmada: una persona puede tener expedientes independientes en varias empresas. `nombre_usuario`, correo, CURP, RFC y NSS pueden repetirse entre empresas, pero son únicos dentro de una misma empresa.
+
+Límite intencional: `Tipos de documento de empleados` conserva comportamiento global existente como catálogo de lectura para expedientes. Propiedad y gobierno de edición no cambian en esta fase; clasificación definitiva corresponde a Fase 6.
 
 Objetivo: aplicar patrón tenant al dominio sensible y complejo.
 
 Alcance:
 
-- agregar `empresa_id` a empleados;
-- convertir unicidades de usuario, correo, CURP, RFC y NSS a alcance empresarial según contrato;
-- asociar documentos a empresa;
-- validar puesto dentro del grupo de empresa activa si `Puestos` queda clasificado como catálogo grupal;
-- validar tipos de documento visibles para empresa;
-- migrar rutas privadas a `empresas/{empresa_id}/...`;
-- adaptar preview y descarga;
-- adaptar acciones transaccionales, locks y restauración;
-- adaptar reportes y dashboard;
-- agregar empresa al activity log;
-- conservar regla de 2 días iniciales.
+- [x] agregar `empresa_id` obligatorio a empleados mediante migración escalonada y backfill;
+- [x] convertir unicidades de usuario, correo, CURP, RFC y NSS a alcance empresarial;
+- [x] asociar documentos a empresa y reforzar empleado-puesto-documento con claves foráneas compuestas;
+- [x] validar puesto dentro de empresa activa;
+- [x] conservar tipos de documento globales visibles para empresas sin anticipar clasificación de Fase 6;
+- [x] guardar archivos nuevos en `empresas/{empresa_id}/empleados/{empleado_id}/...` y limitar compatibilidad heredada a empresa inicial;
+- [x] adaptar preview y descarga con bindings y comprobaciones de empresa, empleado, documento y ruta;
+- [x] adaptar acciones transaccionales, locks, rollback de archivos, reemplazo y restauración;
+- [x] adaptar reportes, dashboard, navegación y Wayfinder;
+- [x] agregar `empresa_id` al activity log y backfill de actividades empresariales existentes;
+- [x] conservar regla de 2 días iniciales.
 
 Pruebas mínimas:
 
-- mismo CURP puede existir en empresas distintas si contrato lo permite;
-- duplicado dentro de misma empresa falla;
-- puesto ajeno falla validación;
-- tipo de documento ajeno falla validación;
-- documento ajeno no puede verse ni descargarse;
-- archivos quedan bajo prefijo empresarial;
-- rollback limpia archivos nuevos;
-- reemplazo elimina archivo anterior correcto;
-- exportación no mezcla empresas;
-- restauración respeta prerequisitos empresariales;
-- concurrencia no produce documentos duplicados.
+- [x] los cinco identificadores pueden repetirse entre empresas;
+- [x] cada identificador duplicado dentro de misma empresa falla en validación y base de datos;
+- [x] puesto ajeno falla en validación y clave foránea compuesta;
+- [x] tipo inactivo o archivado no puede asignarse como documento nuevo; tipo ajeno no aplica mientras catálogo sea global;
+- [x] documento ajeno no puede verse ni descargarse;
+- [x] archivos nuevos quedan bajo prefijo empresarial;
+- [x] rollback limpia archivos nuevos y reemplazo elimina archivo anterior correcto;
+- [x] exportación y dashboard no mezclan empresas;
+- [x] restauración respeta empresa y prerequisitos del puesto;
+- [x] lock transaccional más índice único impiden documentos duplicados por empleado y tipo;
+- [x] `composer ci:check`: 194 pruebas, 1350 aserciones y todos los controles correctos;
+- [x] `npm run build`: correcto.
 
 Criterio de salida:
 
@@ -577,26 +686,36 @@ Criterio de salida:
 
 ### Fase 6 — Catálogos globales e híbridos
 
-Estado: pendiente.
+Estado: completada el 10 de septiembre de 2026.
+
+Clasificación aplicada:
+
+- `Puestos` y salarios: propiedad empresarial; nombre y montos independientes por empresa.
+- `Roles`: propiedad empresarial; mismo nombre permitido entre empresas.
+- `Tipos de documento de empleados`: definición global propiedad de plataforma; empresas consumen catálogo desde expedientes sin modificarlo.
+- extensiones empresariales, catálogos grupales y overrides de tipos de documento: `No verificable`; no implementados hasta confirmar reglas.
 
 Objetivo: permitir configuración común sin perder autonomía empresarial.
 
 Alcance:
 
-- clasificar cada catálogo;
-- separar definición global y configuración empresarial cuando aplique;
-- permitir entradas empresariales sólo donde contrato lo autorice;
-- conservar referencias históricas;
-- definir activación, archivado y restauración;
-- crear UI distinta para plataforma y empresa.
+- [x] clasificar cada catálogo existente con propietario explícito;
+- [x] separar administración global de consumo empresarial;
+- [x] impedir entradas empresariales no autorizadas;
+- [x] conservar referencias históricas al desactivar tipos usados;
+- [x] mantener activación, archivado, restauración y restricción de eliminación en uso;
+- [x] mover administración, reporte y navegación a `/admin`, visibles sólo para plataforma.
 
 Pruebas mínimas:
 
-- empresa ve catálogo global permitido;
-- empresa no modifica definición global;
-- configuración empresarial no altera otras empresas;
-- entradas personalizadas no se filtran;
-- registros históricos sobreviven desactivación.
+- [x] empresas distintas ven mismo catálogo global permitido desde Empleados;
+- [x] empresa no modifica, restaura, elimina ni exporta definición global, incluso con permisos heredados manipulados;
+- [x] permisos globales heredados quedan fuera de roles empresariales y formularios de asignación;
+- [x] entradas empresariales personalizadas no aplican mientras contrato sea `No verificable`;
+- [x] documentos históricos sobreviven desactivación y conservan relación;
+- [x] cambios globales quedan en activity log sin `empresa_id`;
+- [x] `composer ci:check`: 199 pruebas, 1423 aserciones y todos los controles correctos al cierre de Fase 6;
+- [x] `npm run build`: correcto.
 
 Criterio de salida:
 
@@ -604,31 +723,39 @@ Criterio de salida:
 
 ### Fase 7 — Módulos, planes y límites
 
-Estado: pendiente.
+Estado: en curso. Núcleo de módulos y catálogo configurable de planes completados el 10 de septiembre de 2026; asignación comercial y cuotas efectivas pendientes.
+
+Decisión segura aplicada: módulos existentes se habilitan por defecto para conservar compatibilidad. Plataforma puede deshabilitarlos por empresa. Deshabilitar acceso nunca elimina registros. Precio y presentación se administran en catálogo; límite de usuarios queda nullable y sin enforcement hasta definir cifra. Relación técnica plan-módulo sigue `No verificable`; texto de módulos es descriptivo y no concede acceso.
 
 Objetivo: controlar qué sistemas puede usar cada empresa.
 
 Alcance:
 
-- catálogo global de módulos;
-- planes;
-- relación plan-módulo;
-- módulos habilitados por empresa;
-- overrides comerciales auditados;
-- límites de usuarios, empleados, almacenamiento u operaciones;
-- middleware de entitlement;
-- navegación basada en módulo y permiso;
-- pantalla empresarial de plan y consumo;
-- pantalla de plataforma para configuración.
+- [x] catálogo global de módulos `usuarios`, `roles`, `puestos` y `empleados`;
+- [x] catálogo global de planes exclusivo del superadministrador, con CRUD, archivado, búsqueda, filtros y paginación;
+- [x] nombre, precio mensual MXN, color AntD, 20 iconos AntD, módulos descriptivos, límite opcional, gracia y estado activo;
+- [ ] relación plan-módulo — depende de planes confirmados;
+- [x] módulos habilitados por empresa con backfill y alta automática de empresas nuevas;
+- [x] overrides empresariales auditados con actor, empresa, estado anterior y nuevo;
+- [~] límite opcional de usuarios persistido por plan; cifra y enforcement no confirmados. Empleados, almacenamiento y operaciones siguen sin cuota;
+- [x] middleware de entitlement en CRUD, archivos y exportaciones;
+- [x] navegación basada en módulo y permiso;
+- [~] pantalla empresarial muestra módulos habilitados; asignación de plan y consumo esperan contrato comercial;
+- [x] pantalla de plataforma configura módulos por empresa.
+- [x] pantalla de plataforma administra planes y estados archivados.
 
 Pruebas mínimas:
 
-- permiso sin módulo contratado no concede acceso;
-- módulo contratado sin permiso no concede acción;
-- módulo desactivado desaparece de navegación y falla en servidor;
-- override afecta sólo empresa objetivo;
-- límites resisten solicitudes concurrentes;
-- reducción de plan no corrompe datos existentes.
+- [x] permiso sin módulo habilitado no concede acceso;
+- [x] módulo habilitado sin permiso no concede acción;
+- [x] módulo desactivado desaparece de navegación y falla en servidor;
+- [x] override afecta sólo empresa objetivo;
+- [ ] límites resisten solicitudes concurrentes — existe campo configurable, pero no cuota efectiva confirmada;
+- [x] deshabilitación no corrompe ni elimina datos existentes;
+- [x] seeders son idempotentes y no revierten overrides ni desactivación global;
+- [x] catálogo de planes restringido a superadministrador, validado, normalizado y auditado;
+- [x] `composer ci:check`: 210 pruebas, 1562 aserciones y todos los controles correctos;
+- [x] `npm run build`: correcto.
 
 Criterio de salida:
 
@@ -636,22 +763,22 @@ Criterio de salida:
 
 ### Fase 8 — Suscripciones y cobro mensual
 
-Estado: pendiente.
+Estado: base técnica preparada; automatización de cobro pendiente.
 
 Objetivo: automatizar ciclo comercial.
 
-Proveedor confirmado: Stripe mediante Laravel Cashier. Facturación fiscal y reglas comerciales finales siguen pendientes.
+Proveedor confirmado: Stripe mediante Laravel Cashier v16.8. Cashier está instalado, empresa es entidad facturable, migraciones usan `empresa_id`, moneda predeterminada es MXN y locale `es_MX`. No existen llamadas a Stripe, productos, precios, checkout ni webhooks activos. Facturación fiscal y reglas comerciales finales siguen pendientes.
 
 Alcance:
 
-- empresa como entidad facturable;
+- [x] empresa como entidad facturable;
 - estado interno normalizado, independiente de nombres propios de Stripe;
 - alta de suscripción;
-- prueba gratuita si aplica;
+- [x] sin prueba gratuita, decisión confirmada;
 - pagos recurrentes;
 - cambio de plan;
 - cancelación y reactivación;
-- periodo de gracia;
+- [~] periodo de gracia configurable por plan, predeterminado en 15 días; transición automática pendiente;
 - facturas y portal de pago;
 - webhooks firmados;
 - procesamiento idempotente;
@@ -861,19 +988,18 @@ Marcar como `No verificable` hasta confirmación:
 - eliminación, anonimización y respaldo después de `DESACTIVADA`;
 - gobierno de edición para catálogos compartidos por grupo;
 - reglas para mover una empresa entre grupos;
-- soporte por impersonación o sesión delegada;
-- clasificación definitiva de cada catálogo como global o grupal;
+- impersonación o sesión delegada opcional para soporte; acceso directo del superadministrador ya está confirmado;
+- clasificación definitiva de cada catálogo restante como global, grupal o empresarial; Puestos ya fue confirmado como empresarial;
 - posibilidad de subdominios personalizados;
 - necesidad futura de base separada para clientes empresariales;
-- política exacta para empleados que trabajan en varias empresas.
 
 ## Orden recomendado inmediato
 
 1. Cerrar decisiones de Fase 0 necesarias para núcleo.
 2. Implementar Fase 2: Empresa, membresía y contexto.
 3. Implementar Fase 3: roles y permisos empresariales.
-4. Confirmar gobierno de catálogos y convertir un catálogo grupal como piloto.
-5. Auditar patrón piloto y ejecutar pruebas cruzadas.
+4. Convertir Puestos como catálogo empresarial piloto y ejecutar pruebas cruzadas.
+5. Confirmar gobierno y primer catálogo realmente grupal antes de implementar compartición.
 6. Convertir Empleados y documentos.
 7. Clasificar y convertir catálogos.
 8. Construir módulos nuevos usando patrón aprobado.

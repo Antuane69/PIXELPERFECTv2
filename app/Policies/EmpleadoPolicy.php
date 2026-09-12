@@ -20,7 +20,7 @@ class EmpleadoPolicy
      */
     public function view(User $user, Empleado $empleado): bool
     {
-        return $user->can('empleados.view');
+        return $user->can('empleados.view') && $this->belongsToActiveCompany($empleado);
     }
 
     /**
@@ -36,7 +36,7 @@ class EmpleadoPolicy
      */
     public function update(User $user, Empleado $empleado): bool
     {
-        return $user->can('empleados.update');
+        return $user->can('empleados.update') && $this->belongsToActiveCompany($empleado);
     }
 
     /**
@@ -44,7 +44,7 @@ class EmpleadoPolicy
      */
     public function delete(User $user, Empleado $empleado): bool
     {
-        return $user->can('empleados.delete');
+        return $user->can('empleados.delete') && $this->belongsToActiveCompany($empleado);
     }
 
     /**
@@ -52,7 +52,7 @@ class EmpleadoPolicy
      */
     public function restore(User $user, Empleado $empleado): bool
     {
-        return $user->can('empleados.update');
+        return $user->can('empleados.update') && $this->belongsToActiveCompany($empleado);
     }
 
     /**
@@ -61,5 +61,10 @@ class EmpleadoPolicy
     public function forceDelete(User $user, Empleado $empleado): bool
     {
         return false;
+    }
+
+    private function belongsToActiveCompany(Empleado $empleado): bool
+    {
+        return (int) getPermissionsTeamId() === $empleado->empresa_id;
     }
 }

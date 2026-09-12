@@ -2,37 +2,32 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\Users\EnsureAdministratorRemains;
-use App\Actions\Users\EnsureAdministratorRoleAssignmentIsAuthorized;
+use App\EstadoMembresiaEmpresa;
 use App\Http\Requests\Users\StoreUserRequest;
 use App\Http\Requests\Users\UpdateUserRequest;
+use App\Models\Empresa;
+use App\Models\Role;
 use App\Models\User;
-use Illuminate\Auth\Events\Registered;
+use App\Services\Empresas\ManageCompanyUsers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Password;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
     private const INDEX_QUERY_PARAMETERS = ['search', 'per_page', 'page'];
 
-    public function __construct(
-        private readonly EnsureAdministratorRemains $ensureAdministratorRemains,
-        private readonly EnsureAdministratorRoleAssignmentIsAuthorized $ensureAdministratorRoleAssignmentIsAuthorized,
-    ) {}
+    public function __construct(private readonly ManageCompanyUsers $manageUsers) {}
 
     /**
      * Display a paginated user listing.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, Empresa $empresa): Response
     {
         Gate::authorize('viewAny', User::class);
 
@@ -49,6 +44,9 @@ class UserController extends Controller
                 'two_factor_confirmed_at',
                 'created_at',
             ])
+            ->whereHas('membresiasEmpresa', fn (Builder $query) => $query
+                ->where('empresa_id', $empresa->id)
+                ->where('estado', EstadoMembresiaEmpresa::Activa->value))
             ->with(['roles' => fn ($query) => $query
                 ->select(['roles.id', 'name', 'guard_name'])
                 ->orderBy('name')])
@@ -76,6 +74,7 @@ class UserController extends Controller
             'users' => $users,
             'roles' => Role::query()
                 ->select(['id', 'name'])
+                ->where('empresa_id', $empresa->id)
                 ->where('guard_name', 'web')
                 ->orderBy('name')
                 ->get(),
@@ -90,99 +89,63 @@ class UserController extends Controller
     /**
      * Store a newly created user.
      */
-    public function store(StoreUserRequest $request): RedirectResponse
+    public function store(StoreUserRequest $request, Empresa $empresa): RedirectResponse
     {
         Gate::authorize('create', User::class);
 
         $data = $request->validated();
         $roles = Arr::pull($data, 'roles');
 
-        $this->ensureAdministratorRoleAssignmentIsAuthorized->handle($request->user(), $roles);
-
-        $user = DB::transaction(function () use ($data, $roles): User {
-            $user = User::query()->create($data);
-            $user->syncRoles($roles);
-
-            return $user;
-        });
-
-        event(new Registered($user));
+        $this->manageUsers->create($empresa, $request->user(), $data, $roles);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario creado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'users.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.users.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
      * Update the specified user.
      */
-    public function update(UpdateUserRequest $request, User $user): RedirectResponse
+    public function update(UpdateUserRequest $request, Empresa $empresa, User $user): RedirectResponse
     {
         Gate::authorize('update', $user);
 
         $data = $request->validated();
         Arr::forget($data, 'roles');
-        $roles = $request->validatedRoleIds();
-
-        if ($roles !== null) {
-            $this->ensureAdministratorRoleAssignmentIsAuthorized->handle($request->user(), $roles, $user);
-        }
-
-        if (blank($data['password'] ?? null)) {
-            Arr::forget($data, 'password');
-        }
-
-        $emailWasChanged = false;
-
-        DB::transaction(function () use ($user, $data, $roles, &$emailWasChanged): void {
-            if ($roles !== null) {
-                $this->ensureAdministratorRemains->handle($user, $roles);
-            }
-
-            $user->fill($data);
-            $emailWasChanged = $user->isDirty('email');
-
-            if ($emailWasChanged) {
-                $user->forceFill(['email_verified_at' => null]);
-            }
-
-            $user->save();
-
-            if ($roles !== null) {
-                $user->syncRoles($roles);
-            }
-        });
-
-        if ($emailWasChanged) {
-            $user->sendEmailVerificationNotification();
-        }
+        $this->manageUsers->update($empresa, $request->user(), $user, $data, $request->validatedRoleIds());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario actualizado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'users.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.users.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     /**
      * Delete the specified user.
      */
-    public function destroy(Request $request, User $user): RedirectResponse
+    public function destroy(Request $request, Empresa $empresa, User $user): RedirectResponse
     {
         Gate::authorize('delete', $user);
 
-        if ($request->user()?->is($user)) {
-            throw ValidationException::withMessages([
-                'user' => 'No puedes eliminar tu propia cuenta.',
-            ]);
-        }
+        $this->manageUsers->remove($empresa, $request->user(), $user);
 
-        DB::transaction(function () use ($user): void {
-            $this->ensureAdministratorRemains->handle($user);
-            $user->delete();
-        });
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario retirado de la empresa correctamente.']);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Usuario eliminado correctamente.']);
-
-        return $this->redirectToResourceIndex($request, 'users.index', self::INDEX_QUERY_PARAMETERS);
+        return $this->redirectToResourceIndex(
+            $request,
+            'empresas.users.index',
+            self::INDEX_QUERY_PARAMETERS,
+            ['empresa' => $empresa],
+        );
     }
 
     private function perPage(Request $request): int

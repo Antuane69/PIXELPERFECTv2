@@ -22,9 +22,12 @@ class EmpleadoDocumentoFactory extends Factory
     {
         return [
             'empleado_id' => Empleado::factory(),
+            'empresa_id' => fn (array $attributes): mixed => Empleado::query()
+                ->whereKey($attributes['empleado_id'])
+                ->value('empresa_id'),
             'tipo_documento_empleado_id' => TipoDocumentoEmpleado::factory(),
             'nombre_original' => 'documento.pdf',
-            'ruta' => 'empleados/documentos/'.Str::uuid().'.pdf',
+            'ruta' => fn (array $attributes): string => "empresas/{$attributes['empresa_id']}/empleados/{$attributes['empleado_id']}/documentos/".Str::uuid().'.pdf',
             'disco' => 'local',
             'mime_type' => 'application/pdf',
             'tamano' => fake()->numberBetween(10_000, 2_000_000),
@@ -45,7 +48,7 @@ class EmpleadoDocumentoFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'nombre_original' => 'documento.webp',
-            'ruta' => 'empleados/documentos/'.Str::uuid().'.webp',
+            'ruta' => fn (array $resolvedAttributes): string => "empresas/{$resolvedAttributes['empresa_id']}/empleados/{$resolvedAttributes['empleado_id']}/documentos/".Str::uuid().'.webp',
             'mime_type' => 'image/webp',
         ]);
     }

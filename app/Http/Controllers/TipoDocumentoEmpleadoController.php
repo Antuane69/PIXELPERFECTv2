@@ -98,7 +98,7 @@ class TipoDocumentoEmpleadoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'tipos-documento-empleados.index',
+            'platform.tipos-documento-empleados.index',
             self::INDEX_QUERY_PARAMETERS,
         );
     }
@@ -121,7 +121,7 @@ class TipoDocumentoEmpleadoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'tipos-documento-empleados.index',
+            'platform.tipos-documento-empleados.index',
             self::INDEX_QUERY_PARAMETERS,
         );
     }
@@ -148,7 +148,7 @@ class TipoDocumentoEmpleadoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'tipos-documento-empleados.index',
+            'platform.tipos-documento-empleados.index',
             self::INDEX_QUERY_PARAMETERS,
         );
     }
@@ -169,7 +169,7 @@ class TipoDocumentoEmpleadoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'tipos-documento-empleados.index',
+            'platform.tipos-documento-empleados.index',
             self::INDEX_QUERY_PARAMETERS,
             ['archivados' => true],
         );

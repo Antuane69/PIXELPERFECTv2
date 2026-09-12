@@ -84,11 +84,11 @@ class ProfileController extends Controller
         $user = $request->user();
 
         DB::transaction(function () use ($user): void {
-            $this->ensureAdministratorRemains->handle($user);
-            Auth::logout();
+            $this->ensureAdministratorRemains->handleAcrossCompanies($user);
             $user->delete();
         });
 
+        Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

@@ -24,10 +24,13 @@ class DatabaseSeeder extends Seeder
                     'name' => 'Administrador',
                     'password' => 'password',
                     'email_verified_at' => now(),
+                    'es_superadministrador_plataforma' => true,
                 ],
             );
 
             $administrator->syncRoles('Administrador');
+
+            $this->call(EmpresaSeeder::class);
         }
     }
 }

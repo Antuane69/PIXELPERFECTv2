@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Puestos;
 
+use App\Models\Empresa;
 use App\Models\Puesto;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -27,8 +28,10 @@ class UpdatePuestoRequest extends FormRequest
      */
     public function rules(): array
     {
+        $empresa = $this->route('empresa');
         $puesto = $this->route('puesto');
-        $uniqueName = Rule::unique(Puesto::class, 'nombre');
+        $uniqueName = Rule::unique(Puesto::class, 'nombre')
+            ->where('empresa_id', $empresa instanceof Empresa ? $empresa->id : null);
 
         if ($puesto instanceof Puesto) {
             $uniqueName->ignore($puesto);
