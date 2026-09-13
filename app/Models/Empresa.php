@@ -20,6 +20,9 @@ use Laravel\Cashier\Billable;
  * @property string $nombre_legal
  * @property string|null $nombre_comercial
  * @property string $slug
+ * @property string|null $rfc
+ * @property string|null $logo
+ * @property string|null $logo_mime_type
  * @property EstadoEmpresa $estado
  * @property Carbon|null $demo_ends_at
  */
@@ -30,7 +33,10 @@ use Laravel\Cashier\Billable;
     'slug',
     'rfc',
     'correo_contacto',
+    'codigo_pais_contacto',
     'telefono_contacto',
+    'logo',
+    'logo_mime_type',
     'zona_horaria',
     'moneda',
     'estado',
@@ -69,7 +75,13 @@ class Empresa extends Model
 
     public function stripePhone(): ?string
     {
-        return $this->telefono_contacto;
+        if ($this->telefono_contacto === null) {
+            return null;
+        }
+
+        return $this->codigo_pais_contacto === null
+            ? $this->telefono_contacto
+            : '+'.$this->codigo_pais_contacto.$this->telefono_contacto;
     }
 
     /**
@@ -138,6 +150,14 @@ class Empresa extends Model
     public function empleadoDocumentos(): HasMany
     {
         return $this->hasMany(EmpleadoDocumento::class);
+    }
+
+    /**
+     * @return HasMany<TipoDocumentoEmpleado, $this>
+     */
+    public function tiposDocumentoEmpleado(): HasMany
+    {
+        return $this->hasMany(TipoDocumentoEmpleado::class);
     }
 
     /**

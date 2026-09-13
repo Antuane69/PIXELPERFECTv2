@@ -61,7 +61,7 @@ class LegacyDataImporter
             $counts = [
                 'Usuarios' => $this->importUsers($overwrite),
                 'Puestos' => $this->importPuestos($empresaId, $overwrite),
-                'Tipos de documento' => $this->importDocumentTypes($overwrite),
+                'Tipos de documento' => $this->importDocumentTypes($empresaId, $overwrite),
                 'Empleados' => $this->importEmployees($empresaId, $overwrite),
             ];
 
@@ -134,12 +134,12 @@ class LegacyDataImporter
     /**
      * @return array{processed: int, inserted: int, updated: int, skipped: int}
      */
-    private function importDocumentTypes(bool $overwrite): array
+    private function importDocumentTypes(int $empresaId, bool $overwrite): array
     {
         $table = $this->documentTypesTable();
         $usesNormalizedSchema = Schema::connection('legacy')->hasColumn($table, 'es_renovable');
 
-        return $this->importInChunks($table, function (array $legacyType) use ($overwrite, $usesNormalizedSchema): string {
+        return $this->importInChunks($table, function (array $legacyType) use ($empresaId, $overwrite, $usesNormalizedSchema): string {
             $documents = collect($this->decodeJsonArray($legacyType['documentos_aceptados'] ?? null))
                 ->map(static fn (string $extension): string => Str::upper(trim($extension)))
                 ->intersect(self::DOCUMENT_EXTENSIONS)
@@ -153,7 +153,10 @@ class LegacyDataImporter
 
             return $this->persist(
                 'tipo_documento_empleados',
-                ['nombre' => Str::squish((string) $legacyType['nombre'])],
+                [
+                    'empresa_id' => $empresaId,
+                    'nombre' => Str::squish((string) $legacyType['nombre']),
+                ],
                 [
                     'es_renovable' => $frequency,
                     'frecuencia_cantidad' => $frequency

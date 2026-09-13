@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\EstadoMembresiaEmpresa;
 use App\Models\Empresa;
+use App\Models\Modulo;
 use App\Models\User;
 use App\Services\Empresas\EmpresaContext;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -49,7 +50,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $this->userData($request->user()),
             ],
             'empresas' => [
-                'activa' => $this->empresaData($this->empresaContext->empresa()),
+                'activa' => $this->empresaData($this->empresaContext->empresa(), $request->user()),
                 'disponibles' => $this->empresasDisponibles($request->user()),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
@@ -90,7 +91,7 @@ class HandleInertiaRequests extends Middleware
     /**
      * @return array<string, mixed>|null
      */
-    private function empresaData(?Empresa $empresa): ?array
+    private function empresaData(?Empresa $empresa, ?Authenticatable $user): ?array
     {
         if (! $empresa instanceof Empresa) {
             return null;
@@ -100,20 +101,20 @@ class HandleInertiaRequests extends Middleware
             'id' => $empresa->id,
             'nombre' => $empresa->nombre_comercial ?: $empresa->nombre_legal,
             'nombre_legal' => $empresa->nombre_legal,
-            'slug' => $empresa->slug,
             'estado' => $empresa->estado->value,
             'grupo' => $empresa->grupoEmpresarial === null ? null : [
                 'id' => $empresa->grupoEmpresarial->id,
                 'nombre' => $empresa->grupoEmpresarial->nombre,
-                'slug' => $empresa->grupoEmpresarial->slug,
             ],
-            'modulos' => $empresa->modulos()
-                ->where('activo', true)
-                ->wherePivot('habilitado', true)
-                ->orderBy('orden')
-                ->pluck('clave')
-                ->values()
-                ->all(),
+            'modulos' => $user instanceof User && $user->es_superadministrador_plataforma
+                ? Modulo::query()->where('activo', true)->orderBy('orden')->pluck('clave')->values()->all()
+                : $empresa->modulos()
+                    ->where('activo', true)
+                    ->wherePivot('habilitado', true)
+                    ->orderBy('orden')
+                    ->pluck('clave')
+                    ->values()
+                    ->all(),
         ];
     }
 
@@ -135,7 +136,6 @@ class HandleInertiaRequests extends Middleware
                 'empresas.id',
                 'empresas.nombre_legal',
                 'empresas.nombre_comercial',
-                'empresas.slug',
                 'empresas.estado',
                 'empresas.demo_ends_at',
             ])
@@ -145,7 +145,6 @@ class HandleInertiaRequests extends Middleware
                 'id' => $empresa->id,
                 'nombre' => $empresa->nombre_comercial ?: $empresa->nombre_legal,
                 'nombre_legal' => $empresa->nombre_legal,
-                'slug' => $empresa->slug,
                 'estado' => $empresa->estado->value,
                 'puede_acceder' => $user->es_superadministrador_plataforma || $empresa->permiteAcceso(),
             ])

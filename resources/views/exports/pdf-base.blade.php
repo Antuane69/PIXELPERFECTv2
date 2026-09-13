@@ -9,10 +9,10 @@
         <table class="report-header-table">
             <tr>
                 <td class="report-brand">
-                    @if ($logoPath && is_file($logoPath))
-                        <img src="{{ $logoPath }}" alt="{{ config('app.name') }}">
+                    @if ($logoDataUri)
+                        <img src="{{ $logoDataUri }}" alt="{{ $brandName }}">
                     @else
-                        <strong>{{ config('app.name') }}</strong>
+                        <strong>{{ $brandName }}</strong>
                     @endif
                 </td>
                 <td class="report-meta">
@@ -64,5 +64,10 @@
             @endforelse
         </tbody>
     </table>
+
+    <footer class="report-footer">
+        <span>Pixel Perfect · © {{ $copyrightYear }} Todos los derechos reservados.</span>
+        <span>Página <span class="page-number"></span></span>
+    </footer>
 </body>
 </html>

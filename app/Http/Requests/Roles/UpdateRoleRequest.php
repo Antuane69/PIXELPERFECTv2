@@ -2,25 +2,18 @@
 
 namespace App\Http\Requests\Roles;
 
-use App\Models\Empresa;
+use App\AlcancePermiso;
+use App\Models\Modulo;
+use App\Models\Permission;
 use App\Models\Role;
+use App\Services\Empresas\EmpresaContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
-use Spatie\Permission\Models\Permission;
 
 class UpdateRoleRequest extends FormRequest
 {
-    private const PERMISOS_EXCLUSIVOS_PLATAFORMA = [
-        'logs.view',
-        'logs.delete',
-        'tipos_documento.view',
-        'tipos_documento.create',
-        'tipos_documento.update',
-        'tipos_documento.delete',
-    ];
-
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -40,7 +33,15 @@ class UpdateRoleRequest extends FormRequest
     {
         /** @var Role $role */
         $role = $this->route('role');
-        $empresa = $this->route('empresa');
+        $empresaId = app(EmpresaContext::class)->empresaRequerida()->id;
+        $enabledModuleIds = $this->user()?->es_superadministrador_plataforma
+            ? Modulo::query()->where('activo', true)->pluck('id')
+            : Modulo::query()
+                ->where('activo', true)
+                ->whereHas('empresas', fn ($query) => $query
+                    ->where('empresas.id', $empresaId)
+                    ->where('empresa_modulo.habilitado', true))
+                ->pluck('id');
 
         return [
             'name' => [
@@ -49,7 +50,7 @@ class UpdateRoleRequest extends FormRequest
                 'max:255',
                 Rule::unique(Role::class, 'name')
                     ->where('guard_name', 'web')
-                    ->where('empresa_id', $empresa instanceof Empresa ? $empresa->id : null)
+                    ->where('empresa_id', $empresaId)
                     ->ignore($role),
             ],
             'permissions' => ['required', 'array', 'min:1'],
@@ -60,7 +61,8 @@ class UpdateRoleRequest extends FormRequest
                 Rule::exists(Permission::class, 'id')->where(
                     fn ($query) => $query
                         ->where('guard_name', 'web')
-                        ->whereNotIn('name', self::PERMISOS_EXCLUSIVOS_PLATAFORMA),
+                        ->where('alcance', AlcancePermiso::Empresa)
+                        ->whereIn('modulo_id', $enabledModuleIds),
                 ),
             ],
         ];

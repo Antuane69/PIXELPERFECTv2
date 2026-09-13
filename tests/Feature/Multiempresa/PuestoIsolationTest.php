@@ -38,7 +38,8 @@ class PuestoIsolationTest extends TestCase
             'salario_dia' => 850,
         ]);
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->get(route('empresas.puestos.index', $first))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -48,7 +49,8 @@ class PuestoIsolationTest extends TestCase
                 ->where('puestos.data.0.salario_dia', '500.00'),
             );
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($second)
+            ->actingAs($user)
             ->get(route('empresas.puestos.index', $second))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -62,7 +64,8 @@ class PuestoIsolationTest extends TestCase
     {
         [$user, $first, $second] = $this->administratorWithTwoCompaniesInSameGroup();
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->post(route('empresas.puestos.store', $first), [
                 'empresa_id' => $second->id,
                 'nombre' => 'Supervisor',
@@ -82,7 +85,8 @@ class PuestoIsolationTest extends TestCase
         [$user, $first, $second] = $this->administratorWithTwoCompaniesInSameGroup();
         $foreignPosition = Puesto::factory()->for($second)->create(['nombre' => 'Ajeno']);
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->put(route('empresas.puestos.update', [
                 'empresa' => $first,
                 'puesto' => $foreignPosition,
@@ -137,7 +141,8 @@ class PuestoIsolationTest extends TestCase
         Puesto::factory()->for($first)->inactive()->create(['nombre' => 'Local Inactivo']);
         Puesto::factory()->for($second)->create(['nombre' => 'Ajeno Activo', 'activo' => true]);
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->get(route('empresas.inicio', $first))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -171,7 +176,8 @@ class PuestoIsolationTest extends TestCase
         $user = User::factory()->create();
         MembresiaEmpresa::factory()->for($empresa)->for($user)->create();
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($empresa)
+            ->actingAs($user)
             ->get(route('empresas.puestos.index', $empresa))
             ->assertForbidden();
 

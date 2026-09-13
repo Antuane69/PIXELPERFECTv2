@@ -41,6 +41,7 @@ class EmpresaFactory extends Factory
             'slug' => Str::slug($nombre).'-'.fake()->unique()->numberBetween(1000, 999999),
             'rfc' => null,
             'correo_contacto' => fake()->companyEmail(),
+            'codigo_pais_contacto' => '52',
             'telefono_contacto' => fake()->numerify('##########'),
             'zona_horaria' => 'America/Mexico_City',
             'moneda' => 'MXN',

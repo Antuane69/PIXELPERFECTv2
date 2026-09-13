@@ -22,8 +22,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/hooks/use-permissions';
-import type { LaravelPaginator, Permission, Role } from '@/types';
+import { inicio as empresaInicio } from '@/routes/empresas';
 import { exportar as exportarRoles } from '@/routes/empresas/reportes/roles';
+import type { LaravelPaginator, Permission, Role } from '@/types';
 
 type Props = {
     roles: LaravelPaginator<Role>;
@@ -142,7 +143,7 @@ export default function RolesIndex({ roles, permissions, filters }: Props) {
                         <div className="flex flex-wrap gap-2">
                             <ResourceExportDialog
                                 report="roles"
-                                exportUrl={exportarRoles.url(empresa.slug)}
+                                exportUrl={exportarRoles.url()}
                                 filters={{ search: filters?.search }}
                             />
                             {can('roles.create') && (
@@ -159,7 +160,7 @@ export default function RolesIndex({ roles, permissions, filters }: Props) {
                     }
                 />
                 <FiltrosBase
-                    route={index(empresa.slug)}
+                    route={index()}
                     defaultSearch={filters?.search}
                     placeholder="Buscar rol"
                     query={{ per_page: filters?.perPage ?? 15 }}
@@ -179,17 +180,13 @@ export default function RolesIndex({ roles, permissions, filters }: Props) {
                     onOpenChange={setDialogOpen}
                     role={editing}
                     permissions={permissions}
-                    empresaSlug={empresa.slug}
                 />
             )}
             {deleting && (
                 <ConfirmDeleteDialog
                     open
                     onOpenChange={(open) => !open && setDeleting(null)}
-                    form={destroy.form({
-                        empresa: empresa.slug,
-                        role: deleting.id,
-                    })}
+                    form={destroy.form(deleting.id)}
                     subject={`el rol “${deleting.name}”`}
                 />
             )}
@@ -197,18 +194,23 @@ export default function RolesIndex({ roles, permissions, filters }: Props) {
     );
 }
 
+RolesIndex.layout = {
+    breadcrumbs: [
+        { title: 'Inicio', href: empresaInicio() },
+        { title: 'Roles', href: index() },
+    ],
+};
+
 function RoleDialog({
     open,
     onOpenChange,
     role,
     permissions,
-    empresaSlug,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     role: Role | null;
     permissions: Permission[];
-    empresaSlug: string;
 }) {
     const formId = 'role-form';
     const assigned = new Set(
@@ -224,11 +226,7 @@ function RoleDialog({
             title={role ? 'Editar rol' : 'Nuevo rol'}
             description="Selecciona únicamente los permisos necesarios."
             formId={formId}
-            form={
-                role
-                    ? update.form({ empresa: empresaSlug, role: role.id })
-                    : store.form(empresaSlug)
-            }
+            form={role ? update.form(role.id) : store.form()}
             resetOnSuccess={!role}
             className="sm:max-w-3xl"
         >

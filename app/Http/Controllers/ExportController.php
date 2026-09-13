@@ -54,7 +54,7 @@ class ExportController extends Controller
         $definicion = $this->registroReportes->obtener($reporte);
         $moduleKey = $this->registroReportes->modulo($reporte);
 
-        if ($moduleKey !== null) {
+        if ($moduleKey !== null && ! $request->user()?->es_superadministrador_plataforma) {
             abort_unless(
                 $this->empresaContext->empresaRequerida()->moduloHabilitado($moduleKey),
                 403,
@@ -71,6 +71,13 @@ class ExportController extends Controller
 
         $query = $definicion->query($filtros);
         $config = $definicion->config($filtros, $formato);
+        $empresa = $this->empresaContext->empresa();
+
+        if ($empresa !== null) {
+            $config
+                ->brandName($empresa->nombre_comercial ?: $empresa->nombre_legal)
+                ->logoContents($empresa->logo, $empresa->logo_mime_type);
+        }
 
         return match ($formato) {
             'xlsx' => $this->exportService->excelFromQuery($config, $query),

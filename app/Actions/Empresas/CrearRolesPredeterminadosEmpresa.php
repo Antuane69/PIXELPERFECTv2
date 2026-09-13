@@ -2,21 +2,13 @@
 
 namespace App\Actions\Empresas;
 
+use App\AlcancePermiso;
 use App\Models\Empresa;
+use App\Models\Permission;
 use App\Models\Role;
-use Spatie\Permission\Models\Permission;
 
 class CrearRolesPredeterminadosEmpresa
 {
-    private const PERMISOS_EXCLUSIVOS_PLATAFORMA = [
-        'logs.view',
-        'logs.delete',
-        'tipos_documento.view',
-        'tipos_documento.create',
-        'tipos_documento.update',
-        'tipos_documento.delete',
-    ];
-
     public function handle(Empresa $empresa): Role
     {
         $previousTeamId = getPermissionsTeamId();
@@ -33,7 +25,10 @@ class CrearRolesPredeterminadosEmpresa
             $role->syncPermissions(
                 Permission::query()
                     ->where('guard_name', 'web')
-                    ->whereNotIn('name', self::PERMISOS_EXCLUSIVOS_PLATAFORMA)
+                    ->where('alcance', AlcancePermiso::Empresa)
+                    ->whereHas('modulo.empresas', fn ($query) => $query
+                        ->where('empresas.id', $empresa->id)
+                        ->where('empresa_modulo.habilitado', true))
                     ->get(),
             );
 

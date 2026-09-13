@@ -1,11 +1,13 @@
-import { Head, usePage } from '@inertiajs/react';
-import { Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Mail, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     destroy,
     index,
+    sendPasswordReset,
     store,
     update,
+    updateTwoFactor as updateUserTwoFactor,
 } from '@/actions/App/Http/Controllers/UserController';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { FiltrosBase } from '@/components/filtros-base';
@@ -23,9 +25,11 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { usePermissions } from '@/hooks/use-permissions';
-import type { LaravelPaginator, ManagedUser, Role } from '@/types';
+import { inicio as empresaInicio } from '@/routes/empresas';
 import { exportar as exportarUsuarios } from '@/routes/empresas/reportes/usuarios';
+import type { LaravelPaginator, ManagedUser, Role } from '@/types';
 
 type Props = {
     users: LaravelPaginator<ManagedUser>;
@@ -51,6 +55,8 @@ export default function UsersIndex({
     }
 
     const canAssignRoles = can('users.assign_roles');
+    const canManageTwoFactor = can('users.manage_two_factor');
+    const canSendPasswordReset = can('users.send_password_reset');
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<ManagedUser | null>(null);
     const [deleting, setDeleting] = useState<ManagedUser | null>(null);
@@ -163,7 +169,7 @@ export default function UsersIndex({
                         <div className="flex flex-wrap gap-2">
                             <ResourceExportDialog
                                 report="usuarios"
-                                exportUrl={exportarUsuarios.url(empresa.slug)}
+                                exportUrl={exportarUsuarios.url()}
                                 filters={{ search: filters?.search }}
                             />
                             {can('users.create') && canAssignRoles && (
@@ -175,7 +181,7 @@ export default function UsersIndex({
                     }
                 />
                 <FiltrosBase
-                    route={index(empresa.slug)}
+                    route={index()}
                     defaultSearch={filters?.search}
                     placeholder="Buscar por nombre o correo"
                     query={{ per_page: filters?.perPage ?? 15 }}
@@ -191,13 +197,15 @@ export default function UsersIndex({
 
             {dialogOpen && (
                 <UserDialog
+                    key={editing?.id ?? 'new'}
                     open={dialogOpen}
                     onOpenChange={setDialogOpen}
                     user={editing}
                     roles={roles}
-                    empresaSlug={empresa.slug}
                     assignedRoles={assignedRoles}
                     canAssignRoles={canAssignRoles}
+                    canManageTwoFactor={canManageTwoFactor}
+                    canSendPasswordReset={canSendPasswordReset}
                     passwordRules={passwordRules}
                 />
             )}
@@ -206,10 +214,7 @@ export default function UsersIndex({
                 <ConfirmDeleteDialog
                     open={Boolean(deleting)}
                     onOpenChange={(open) => !open && setDeleting(null)}
-                    form={destroy.form({
-                        empresa: empresa.slug,
-                        user: deleting.id,
-                    })}
+                    form={destroy.form(deleting.id)}
                     subject={`el usuario “${deleting.name}”`}
                 />
             )}
@@ -217,32 +222,74 @@ export default function UsersIndex({
     );
 }
 
+UsersIndex.layout = {
+    breadcrumbs: [
+        { title: 'Inicio', href: empresaInicio() },
+        { title: 'Usuarios', href: index() },
+    ],
+};
+
 function UserDialog({
     open,
     onOpenChange,
     user,
     roles,
-    empresaSlug,
     assignedRoles,
     canAssignRoles,
+    canManageTwoFactor,
+    canSendPasswordReset,
     passwordRules,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     user: ManagedUser | null;
     roles: Role[];
-    empresaSlug: string;
     assignedRoles: Set<string | number>;
     canAssignRoles: boolean;
+    canManageTwoFactor: boolean;
+    canSendPasswordReset: boolean;
     passwordRules: string;
 }) {
     const formId = 'user-form';
     const { auth } = usePage().props;
     const canEditIdentity =
         !user || (auth.user?.es_superadministrador_plataforma ?? false);
-    const route = user
-        ? update.form({ empresa: empresaSlug, user: user.id })
-        : store.form(empresaSlug);
+    const route = user ? update.form(user.id) : store.form();
+    const [twoFactorEnabled, setTwoFactorEnabled] = useState(
+        user?.two_factor_enabled ?? false,
+    );
+    const [twoFactorProcessing, setTwoFactorProcessing] = useState(false);
+    const passwordResetForm = useForm({});
+
+    const toggleTwoFactor = (enabled: boolean) => {
+        if (!user) {
+            return;
+        }
+
+        setTwoFactorProcessing(true);
+        router.patch(
+            updateUserTwoFactor.url(user.id),
+            { enabled },
+            {
+                preserveScroll: true,
+                onSuccess: () => setTwoFactorEnabled(enabled),
+                onError: () =>
+                    setTwoFactorEnabled(user.two_factor_enabled ?? false),
+                onFinish: () => setTwoFactorProcessing(false),
+            },
+        );
+    };
+
+    const requestPasswordReset = () => {
+        if (!user) {
+            return;
+        }
+
+        passwordResetForm.post(sendPasswordReset.url(user.id), {
+            preserveScroll: true,
+            onSuccess: () => onOpenChange(false),
+        });
+    };
 
     return (
         <ResourceFormDialog
@@ -371,6 +418,71 @@ function UserDialog({
                         )}
                         <InputError message={errors.roles} />
                     </fieldset>
+                    {user && canManageTwoFactor ? (
+                        <fieldset className="grid gap-3 rounded-lg border p-4">
+                            <legend className="flex items-center gap-2 px-1 text-sm font-medium">
+                                <ShieldCheck className="size-4" /> Seguridad
+                            </legend>
+                            <label
+                                htmlFor="user-two-factor"
+                                className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-accent/60"
+                            >
+                                <Checkbox
+                                    id="user-two-factor"
+                                    checked={twoFactorEnabled}
+                                    disabled={twoFactorProcessing}
+                                    onCheckedChange={(checked) =>
+                                        toggleTwoFactor(checked === true)
+                                    }
+                                />
+                                <span className="grid gap-1 text-sm">
+                                    <span className="font-medium">
+                                        Autenticación de dos factores
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Activa o desactiva 2FA para este
+                                        usuario.
+                                    </span>
+                                </span>
+                            </label>
+                            <InputError message={errors.enabled} />
+                        </fieldset>
+                    ) : null}
+                    {user && canSendPasswordReset ? (
+                        <fieldset className="grid gap-3 rounded-lg border p-4">
+                            <legend className="px-1 text-sm font-medium">
+                                Restablecimiento de contraseña
+                            </legend>
+                            <p className="text-sm text-muted-foreground">
+                                Envía a {user.email} un enlace para crear una
+                                nueva contraseña.
+                            </p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-fit"
+                                onClick={requestPasswordReset}
+                                disabled={passwordResetForm.processing}
+                            >
+                                {passwordResetForm.processing ? (
+                                    <Spinner />
+                                ) : (
+                                    <Mail />
+                                )}
+                                Enviar correo de restablecimiento
+                            </Button>
+                            <InputError
+                                message={
+                                    (
+                                        passwordResetForm.errors as Record<
+                                            string,
+                                            string
+                                        >
+                                    ).user
+                                }
+                            />
+                        </fieldset>
+                    ) : null}
                 </div>
             )}
         </ResourceFormDialog>

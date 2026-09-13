@@ -46,9 +46,10 @@ class MultiempresaRegressionTest extends TestCase
         }
         $before = $target->fresh()->getAttributes();
         $changes = ['name' => 'Changed Name', 'email' => 'changed@example.com', 'password' => 'Changed-password1!'];
-        $this->actingAs($actor)->put(route('empresas.users.update', [$empresa, $target]), [
-            $field => $changes[$field], 'password_confirmation' => 'Changed-password1!',
-        ])->assertSessionHasErrors($field);
+        $this->withEmpresaContext($empresa)
+            ->actingAs($actor)->put(route('empresas.users.update', ['user' => $target]), [
+                $field => $changes[$field], 'password_confirmation' => 'Changed-password1!',
+            ])->assertSessionHasErrors($field);
         $target->refresh();
         foreach (['name', 'email', 'password', 'email_verified_at', 'es_superadministrador_plataforma'] as $attribute) {
             $this->assertSame($before[$attribute], $target->getRawOriginal($attribute));
@@ -80,9 +81,10 @@ class MultiempresaRegressionTest extends TestCase
         setPermissionsTeamId($empresa->id);
         $localRole = Role::create(['empresa_id' => $empresa->id, 'name' => 'Local', 'guard_name' => 'web']);
         $before = $target->fresh()->getAttributes();
-        $this->actingAs($actor)->put(route('empresas.users.update', [$empresa, $target]), [
-            'roles' => [$localRole->id],
-        ])->assertSessionHasNoErrors()->assertRedirect(route('empresas.users.index', $empresa));
+        $this->withEmpresaContext($empresa)
+            ->actingAs($actor)->put(route('empresas.users.update', ['user' => $target]), [
+                'roles' => [$localRole->id],
+            ])->assertSessionHasNoErrors()->assertRedirect(route('empresas.users.index'));
         $this->assertDatabaseHas('model_has_roles', ['empresa_id' => $empresa->id, 'role_id' => $localRole->id, 'model_id' => $target->id]);
         $this->assertDatabaseHas('model_has_roles', ['empresa_id' => $other->id, 'role_id' => $foreignRole->id, 'model_id' => $target->id]);
         $this->assertSame($before, $target->fresh()->getAttributes());
@@ -94,10 +96,11 @@ class MultiempresaRegressionTest extends TestCase
         $empresa = Empresa::factory()->activa()->create();
         $role = app(CrearRolesPredeterminadosEmpresa::class)->handle($empresa);
         $actor = User::factory()->superadministradorPlataforma()->create();
-        $this->actingAs($actor)->post(route('empresas.users.store', $empresa), [
-            'name' => 'First Admin', 'email' => 'first-admin@example.com',
-            'password' => 'Secure-password1!', 'password_confirmation' => 'Secure-password1!', 'roles' => [$role->id],
-        ])->assertSessionHasNoErrors()->assertRedirect(route('empresas.users.index', $empresa));
+        $this->withEmpresaContext($empresa)
+            ->actingAs($actor)->post(route('empresas.users.store'), [
+                'name' => 'First Admin', 'email' => 'first-admin@example.com',
+                'password' => 'Secure-password1!', 'password_confirmation' => 'Secure-password1!', 'roles' => [$role->id],
+            ])->assertSessionHasNoErrors()->assertRedirect(route('empresas.users.index'));
         $target = User::where('email', 'first-admin@example.com')->firstOrFail();
         $this->assertDatabaseHas('membresias_empresa', ['empresa_id' => $empresa->id, 'user_id' => $target->id, 'estado' => 'ACTIVA']);
         $this->assertDatabaseHas('model_has_roles', ['empresa_id' => $empresa->id, 'model_id' => $target->id, 'role_id' => $role->id]);
@@ -112,13 +115,14 @@ class MultiempresaRegressionTest extends TestCase
         $target = User::factory()->create();
         $this->membership($empresa, $target);
 
-        $this->actingAs($actor)->put(route('empresas.users.update', [$empresa, $target]), [
-            'name' => 'Updated Identity',
-            'email' => 'updated-identity@example.com',
-            'password' => 'Changed-password1!',
-            'password_confirmation' => 'Changed-password1!',
-            'es_superadministrador_plataforma' => true,
-        ])->assertSessionHasNoErrors();
+        $this->withEmpresaContext($empresa)
+            ->actingAs($actor)->put(route('empresas.users.update', ['user' => $target]), [
+                'name' => 'Updated Identity',
+                'email' => 'updated-identity@example.com',
+                'password' => 'Changed-password1!',
+                'password_confirmation' => 'Changed-password1!',
+                'es_superadministrador_plataforma' => true,
+            ])->assertSessionHasNoErrors();
 
         $target->refresh();
         $this->assertSame('Updated Identity', $target->name);
@@ -137,27 +141,27 @@ class MultiempresaRegressionTest extends TestCase
         $view = Permission::findByName('users.view', 'web');
         $edit = Permission::findByName('users.update', 'web');
         $logs = Permission::findByName('logs.view', 'web');
-        $this->actingAs($actor)->get(route('empresas.roles.index', $empresa))
-            ->assertOk()->assertInertia(fn (Assert $page) => $page->has('permissions', 17)
+        $this->withEmpresaContext($empresa)
+            ->actingAs($actor)->get(route('empresas.roles.index'))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page->has('permissions', 21)
             ->where('permissions', fn ($permissions): bool => ! collect($permissions)->contains(
                 fn (array $permission): bool => in_array($permission['name'], [
                     'logs.view',
-                    'tipos_documento.view',
                 ], true),
             )));
-        $this->post(route('empresas.roles.store', $empresa), ['name' => 'Viewer', 'permissions' => [$view->id]])
+        $this->post(route('empresas.roles.store'), ['name' => 'Viewer', 'permissions' => [$view->id]])
             ->assertSessionHasNoErrors();
         $role = Role::where('empresa_id', $empresa->id)->where('name', 'Viewer')->firstOrFail();
-        $this->put(route('empresas.roles.update', [$empresa, $role]), ['name' => 'Editor', 'permissions' => [$view->id, $edit->id]])
+        $this->put(route('empresas.roles.update', $role), ['name' => 'Editor', 'permissions' => [$view->id, $edit->id]])
             ->assertSessionHasNoErrors();
         $this->assertEqualsCanonicalizing([$view->id, $edit->id], $role->fresh()->permissions->modelKeys());
-        $this->post(route('empresas.roles.store', $empresa), ['name' => 'Forbidden', 'permissions' => [$logs->id]])
+        $this->post(route('empresas.roles.store'), ['name' => 'Forbidden', 'permissions' => [$logs->id]])
             ->assertSessionHasErrors('permissions.0');
-        $this->put(route('empresas.roles.update', [$empresa, $role]), ['name' => 'Forbidden update', 'permissions' => [$logs->id]])
+        $this->put(route('empresas.roles.update', $role), ['name' => 'Forbidden update', 'permissions' => [$logs->id]])
             ->assertSessionHasErrors('permissions.0');
-        $this->put(route('empresas.roles.update', [$empresa, $administratorRole]), ['name' => 'Renamed', 'permissions' => [$view->id]])
+        $this->put(route('empresas.roles.update', $administratorRole), ['name' => 'Renamed', 'permissions' => [$view->id]])
             ->assertSessionHasErrors('role');
-        $this->delete(route('empresas.roles.destroy', [$empresa, $administratorRole]))->assertSessionHasErrors('role');
+        $this->delete(route('empresas.roles.destroy', $administratorRole))->assertSessionHasErrors('role');
         $this->assertSame('Administrador', $administratorRole->fresh()->name);
     }
 
@@ -175,9 +179,10 @@ class MultiempresaRegressionTest extends TestCase
         Role::create(['empresa_id' => $initial->id, 'name' => 'Audit Local', 'guard_name' => 'web']);
         Role::create(['empresa_id' => $foreign->id, 'name' => 'Audit Foreign', 'guard_name' => 'web']);
         foreach (['usuarios', 'roles'] as $report) {
-            $response = $this->actingAs($actor)->post(route('reportes.exportar', $report), [
-                'formato' => 'xlsx', 'filtros' => ['search' => 'Audit'],
-            ])->assertOk()->assertDownload();
+            $response = $this->withEmpresaContext($initial)
+                ->actingAs($actor)->post(route('reportes.exportar', $report), [
+                    'formato' => 'xlsx', 'filtros' => ['search' => 'Audit'],
+                ])->assertOk()->assertDownload();
             $file = $response->baseResponse->getFile()->getPathname();
             $spreadsheet = IOFactory::load($file);
             $rows = $spreadsheet->getActiveSheet()->toArray();
@@ -188,7 +193,10 @@ class MultiempresaRegressionTest extends TestCase
             $spreadsheet->disconnectWorksheets();
         }
         $foreignActor = $this->administrator($foreign);
-        $this->actingAs($foreignActor)->post(route('reportes.exportar', 'usuarios'), ['formato' => 'xlsx'])->assertNotFound();
+        $this->withEmpresaContext($foreign)
+            ->actingAs($foreignActor)
+            ->post(route('reportes.exportar', 'usuarios'), ['formato' => 'xlsx'])
+            ->assertOk();
     }
 
     #[DataProvider('reportClasses')]
@@ -213,11 +221,13 @@ class MultiempresaRegressionTest extends TestCase
         $suspended = $this->administrator($empresa);
         $suspended->membresiasEmpresa()->where('empresa_id', $empresa->id)->update(['estado' => 'SUSPENDIDA']);
         $viewer = Role::create(['empresa_id' => $empresa->id, 'name' => 'Viewer', 'guard_name' => 'web']);
-        $this->actingAs($active)->put(route('empresas.users.update', [$empresa, $active]), ['roles' => [$viewer->id]])
+        $this->withEmpresaContext($empresa)
+            ->actingAs($active)->put(route('empresas.users.update', ['user' => $active]), ['roles' => [$viewer->id]])
             ->assertSessionHasErrors('roles');
         $this->assertTrue($active->fresh()->hasRole('Administrador'));
         $platform = User::factory()->superadministradorPlataforma()->create();
-        $this->actingAs($platform)->delete(route('empresas.users.destroy', [$empresa, $active]))->assertSessionHasErrors('roles');
+        $this->withEmpresaContext($empresa)
+            ->actingAs($platform)->delete(route('empresas.users.destroy', ['user' => $active]))->assertSessionHasErrors('roles');
         $this->assertDatabaseHas('membresias_empresa', ['empresa_id' => $empresa->id, 'user_id' => $active->id]);
     }
 
@@ -248,7 +258,8 @@ class MultiempresaRegressionTest extends TestCase
         $active = $this->administrator($empresa);
         $this->administrator($empresa);
         $viewer = Role::create(['empresa_id' => $empresa->id, 'name' => 'Viewer', 'guard_name' => 'web']);
-        $this->actingAs($active)->put(route('empresas.users.update', [$empresa, $active]), ['roles' => [$viewer->id]])
+        $this->withEmpresaContext($empresa)
+            ->actingAs($active)->put(route('empresas.users.update', ['user' => $active]), ['roles' => [$viewer->id]])
             ->assertSessionHasNoErrors();
         $this->assertTrue($active->fresh()->hasExactRoles([$viewer]));
     }
@@ -257,14 +268,18 @@ class MultiempresaRegressionTest extends TestCase
     {
         $empresa = Empresa::factory()->vencida()->create();
         $actor = User::factory()->superadministradorPlataforma()->create();
-        $this->actingAs($actor)->get(route('empresas.inicio', $empresa))->assertOk()
+        $this->actingAs($actor)
+            ->post(route('empresa-contexto.store'), ['empresa_id' => $empresa->id])
+            ->assertRedirect(route('empresas.inicio'));
+        $this->get(route('empresas.inicio'))->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('empresas.disponibles',
                 fn ($companies): bool => collect($companies)->firstWhere('id', $empresa->id)['puede_acceder'] === true));
         $member = User::factory()->create();
         $this->membership($empresa, $member);
-        $this->actingAs($member)->get(route('dashboard'))->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('empresas.disponibles.0.puede_acceder', false));
-        $this->get(route('empresas.inicio', $empresa))->assertForbidden();
+        $this->actingAs($member)
+            ->get(route('dashboard'))
+            ->assertRedirect(route('empresa-contexto.create'));
+        $this->post(route('empresa-contexto.store'), ['empresa_id' => $empresa->id])->assertForbidden();
     }
 
     private function administrator(Empresa $empresa): User

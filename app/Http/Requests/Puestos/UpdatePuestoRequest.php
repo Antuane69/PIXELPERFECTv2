@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Puestos;
 
-use App\Models\Empresa;
 use App\Models\Puesto;
+use App\Services\Empresas\EmpresaContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -28,10 +28,10 @@ class UpdatePuestoRequest extends FormRequest
      */
     public function rules(): array
     {
-        $empresa = $this->route('empresa');
+        $empresaId = app(EmpresaContext::class)->empresaRequerida()->id;
         $puesto = $this->route('puesto');
         $uniqueName = Rule::unique(Puesto::class, 'nombre')
-            ->where('empresa_id', $empresa instanceof Empresa ? $empresa->id : null);
+            ->where('empresa_id', $empresaId);
 
         if ($puesto instanceof Puesto) {
             $uniqueName->ignore($puesto);
@@ -39,8 +39,8 @@ class UpdatePuestoRequest extends FormRequest
 
         return [
             'nombre' => ['sometimes', 'required', 'string', 'min:2', 'max:255', $uniqueName],
-            'salario_dia' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'salario_quincena' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            'salario_dia' => ['sometimes', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'salario_quincena' => ['sometimes', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'activo' => ['sometimes', 'boolean'],
         ];
     }

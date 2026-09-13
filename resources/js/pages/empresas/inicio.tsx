@@ -63,7 +63,7 @@ export default function EmpresaInicio({ empresa, modulos, stats }: Props) {
                     {stats.puestosActivos !== null && can('puestos.view') && (
                         <Card>
                             <Link
-                                href={puestosIndex(empresa.slug)}
+                                href={puestosIndex()}
                                 prefetch
                                 className="grid gap-4 p-6"
                             >
@@ -93,7 +93,7 @@ export default function EmpresaInicio({ empresa, modulos, stats }: Props) {
                     {stats.empleados !== null && can('empleados.view') && (
                         <Card>
                             <Link
-                                href={empleadosIndex(empresa.slug)}
+                                href={empleadosIndex()}
                                 prefetch
                                 className="grid gap-4 p-6"
                             >

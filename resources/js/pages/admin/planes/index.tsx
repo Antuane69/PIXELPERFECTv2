@@ -271,7 +271,12 @@ function PlanDialog({
             resetOnSuccess={!plan}
         >
             {(errors) => (
-                <PlanFormFields plan={plan} iconos={iconos} errors={errors} />
+                <PlanFormFields
+                    key={plan?.id ?? 'new'}
+                    plan={plan}
+                    iconos={iconos}
+                    errors={errors}
+                />
             )}
         </ResourceFormDialog>
     );

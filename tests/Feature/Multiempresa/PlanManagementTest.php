@@ -197,7 +197,7 @@ class PlanManagementTest extends TestCase
         $this->assertContains(Billable::class, class_uses_recursive(Empresa::class));
         $this->assertSame('Empresa Facturable', $empresa->stripeName());
         $this->assertSame('cobranza@example.com', $empresa->stripeEmail());
-        $this->assertSame('5555555555', $empresa->stripePhone());
+        $this->assertSame('+525555555555', $empresa->stripePhone());
         $this->assertNull($empresa->trial_ends_at);
         $this->assertTrue(Schema::hasColumns('empresas', ['stripe_id', 'pm_type', 'pm_last_four', 'trial_ends_at']));
         $this->assertTrue(Schema::hasColumn('subscriptions', 'empresa_id'));

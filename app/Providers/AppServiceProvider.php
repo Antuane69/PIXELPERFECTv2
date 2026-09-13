@@ -3,8 +3,12 @@
 namespace App\Providers;
 
 use App\Models\Empresa;
+use App\Models\Modulo;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Policies\ModuloPolicy;
+use App\Policies\PermissionPolicy;
 use App\Policies\RolePolicy;
 use App\Services\Empresas\EmpresaContext;
 use Carbon\CarbonImmutable;
@@ -41,6 +45,8 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::policy(Role::class, RolePolicy::class);
+        Gate::policy(Modulo::class, ModuloPolicy::class);
+        Gate::policy(Permission::class, PermissionPolicy::class);
         Gate::define(
             'viewLogViewer',
             static fn (User $user): bool => $user->es_superadministrador_plataforma,

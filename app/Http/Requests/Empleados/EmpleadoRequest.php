@@ -5,6 +5,8 @@ namespace App\Http\Requests\Empleados;
 use App\Models\Empleado;
 use App\Models\Puesto;
 use App\Models\TipoDocumentoEmpleado;
+use Closure;
+use DateTimeImmutable;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
@@ -49,7 +51,7 @@ abstract class EmpleadoRequest extends FormRequest
                 'string',
                 'min:4',
                 'max:60',
-                'regex:/^[a-z0-9._-]+$/',
+                'regex:/^[a-z0-9-]+$/',
                 $this->uniqueRule('nombre_usuario'),
             ],
             'correo' => [
@@ -64,15 +66,39 @@ abstract class EmpleadoRequest extends FormRequest
                 'required',
                 'string',
                 'size:18',
-                'regex:/^[A-Z][AEIOUX][A-Z]{2}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[HM][A-Z]{2}[BCDFGHJKLMNPQRSTVWXYZ]{3}[A-Z0-9][0-9]$/',
+                'regex:/\A[A-Z][AEIOUX][A-Z]{2}[0-9]{6}[HM][A-Z]{2}[BCDFGHJKLMNPQRSTVWXYZ]{3}[A-Z0-9][0-9]\z/',
+                static function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! is_string($value) || ! preg_match('/\A[A-Z][AEIOUX][A-Z]{2}[0-9]{6}[HM][A-Z]{2}[BCDFGHJKLMNPQRSTVWXYZ]{3}[A-Z0-9][0-9]\z/', $value)) {
+                        return;
+                    }
+
+                    $date = DateTimeImmutable::createFromFormat('!ymd', substr($value, 4, 6));
+                    $dateErrors = DateTimeImmutable::getLastErrors();
+
+                    if ($date === false || ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0))) {
+                        $fail('La CURP debe incluir una fecha válida.');
+                    }
+                },
                 $this->uniqueRule('curp'),
             ],
             'rfc' => [
                 $required,
                 'required',
                 'string',
-                'max:13',
-                'regex:/^[A-Z&Ñ]{3,4}\d{6}[A-Z\d]{3}$/u',
+                'size:13',
+                'regex:/\A[A-ZÑ&]{4}\d{6}[A-Z\d]{3}\z/u',
+                static function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! is_string($value) || ! preg_match('/\A[A-ZÑ&]{4}\d{6}[A-Z\d]{3}\z/u', $value)) {
+                        return;
+                    }
+
+                    $date = DateTimeImmutable::createFromFormat('!ymd', substr($value, 4, 6));
+                    $dateErrors = DateTimeImmutable::getLastErrors();
+
+                    if ($date === false || ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0))) {
+                        $fail('El RFC debe incluir una fecha válida en formato mexicano.');
+                    }
+                },
                 $this->uniqueRule('rfc'),
             ],
             'nss' => [
@@ -116,7 +142,7 @@ abstract class EmpleadoRequest extends FormRequest
                 'string',
                 Rule::in(['masculino', 'femenino', 'otro']),
             ],
-            'domicilio' => [$required, 'required', 'string', 'min:10', 'max:250'],
+            'domicilio' => [$nullable, 'nullable', 'string', 'min:10', 'max:250'],
             'telefono' => [$required, 'required', 'string', 'regex:/^[0-9]{10}$/'],
             'avatar' => [$nullable, 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:3072'],
             'salario_dia' => [
@@ -159,7 +185,7 @@ abstract class EmpleadoRequest extends FormRequest
                 'distinct',
                 Rule::exists(TipoDocumentoEmpleado::class, 'id')->where(
                     static function ($query) use ($existingDocumentTypeIds): void {
-                        $query->whereNull('deleted_at')->where(
+                        $query->where('empresa_id', getPermissionsTeamId())->whereNull('deleted_at')->where(
                             static function ($query) use ($existingDocumentTypeIds): void {
                                 $query->where('activo', true);
 
@@ -354,6 +380,7 @@ abstract class EmpleadoRequest extends FormRequest
             ->values();
 
         $types = TipoDocumentoEmpleado::query()
+            ->where('empresa_id', getPermissionsTeamId())
             ->where(function ($query) use ($typeIds): void {
                 $query->where('activo', true);
 

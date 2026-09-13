@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\AlcancePermiso;
 use App\Http\Requests\Roles\StoreRoleRequest;
 use App\Http\Requests\Roles\UpdateRoleRequest;
-use App\Models\Empresa;
+use App\Models\Modulo;
+use App\Models\Permission;
 use App\Models\Role;
+use App\Services\Empresas\EmpresaContext;
 use App\Services\Empresas\ManageCompanyRoles;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -14,32 +17,32 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Models\Permission;
 
 class RoleController extends Controller
 {
     private const INDEX_QUERY_PARAMETERS = ['search', 'per_page', 'page'];
 
-    private const PERMISOS_EXCLUSIVOS_PLATAFORMA = [
-        'logs.view',
-        'logs.delete',
-        'tipos_documento.view',
-        'tipos_documento.create',
-        'tipos_documento.update',
-        'tipos_documento.delete',
-    ];
-
-    public function __construct(private readonly ManageCompanyRoles $manageRoles) {}
+    public function __construct(
+        private readonly ManageCompanyRoles $manageRoles,
+        private readonly EmpresaContext $empresaContext,
+    ) {}
 
     /**
      * Display a paginated role listing.
      */
-    public function index(Request $request, Empresa $empresa): Response
+    public function index(Request $request): Response
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('viewAny', Role::class);
 
         $search = $request->string('search')->squish()->toString();
         $perPage = $this->perPage($request);
+        $enabledModuleIds = $request->user()?->es_superadministrador_plataforma
+            ? Modulo::query()->where('activo', true)->pluck('id')
+            : $empresa->modulos()
+                ->where('activo', true)
+                ->wherePivot('habilitado', true)
+                ->pluck('modulos.id');
 
         $roles = Role::query()
             ->select(['id', 'name', 'guard_name'])
@@ -47,7 +50,8 @@ class RoleController extends Controller
             ->where('guard_name', 'web')
             ->with(['permissions' => fn ($query) => $query
                 ->select(['permissions.id', 'name', 'guard_name'])
-                ->whereNotIn('name', self::PERMISOS_EXCLUSIVOS_PLATAFORMA)
+                ->where('alcance', AlcancePermiso::Empresa)
+                ->whereIn('modulo_id', $enabledModuleIds)
                 ->orderBy('name')])
             ->withCount('users')
             ->when($search !== '', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
@@ -66,7 +70,8 @@ class RoleController extends Controller
             'permissions' => Permission::query()
                 ->select(['id', 'name'])
                 ->where('guard_name', 'web')
-                ->whereNotIn('name', self::PERMISOS_EXCLUSIVOS_PLATAFORMA)
+                ->where('alcance', AlcancePermiso::Empresa)
+                ->whereIn('modulo_id', $enabledModuleIds)
                 ->when(
                     ! $request->user()?->es_superadministrador_plataforma
                         && ! $request->user()?->hasRole('Administrador', 'web'),
@@ -87,8 +92,9 @@ class RoleController extends Controller
     /**
      * Store a newly created role.
      */
-    public function store(StoreRoleRequest $request, Empresa $empresa): RedirectResponse
+    public function store(StoreRoleRequest $request): RedirectResponse
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('create', Role::class);
 
         $data = $request->validated();
@@ -102,15 +108,15 @@ class RoleController extends Controller
             $request,
             'empresas.roles.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa],
         );
     }
 
     /**
      * Update the specified role.
      */
-    public function update(UpdateRoleRequest $request, Empresa $empresa, Role $role): RedirectResponse
+    public function update(UpdateRoleRequest $request, Role $role): RedirectResponse
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('update', $role);
 
         $data = $request->validated();
@@ -124,15 +130,15 @@ class RoleController extends Controller
             $request,
             'empresas.roles.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa],
         );
     }
 
     /**
      * Delete the specified role.
      */
-    public function destroy(Request $request, Empresa $empresa, Role $role): RedirectResponse
+    public function destroy(Request $request, Role $role): RedirectResponse
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('delete', $role);
 
         $this->manageRoles->delete($empresa, $request->user(), $role);
@@ -143,7 +149,6 @@ class RoleController extends Controller
             $request,
             'empresas.roles.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa],
         );
     }
 

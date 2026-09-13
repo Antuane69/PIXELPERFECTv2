@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['clave', 'nombre', 'descripcion', 'activo', 'orden'])]
 class Modulo extends Model
@@ -22,6 +23,12 @@ class Modulo extends Model
         return $this->belongsToMany(Empresa::class, 'empresa_modulo')
             ->withPivot('habilitado')
             ->withTimestamps();
+    }
+
+    /** @return HasMany<Permission, $this> */
+    public function permisos(): HasMany
+    {
+        return $this->hasMany(Permission::class);
     }
 
     /** @return array<string, string> */

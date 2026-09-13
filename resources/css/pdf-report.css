@@ -44,6 +44,25 @@ body {
     margin-bottom: 3px;
 }
 
+.report-footer {
+    border-top: 1px solid #e6d8ec;
+    bottom: -45px;
+    color: #6f5978;
+    font-size: 7px;
+    left: 0;
+    padding-top: 6px;
+    position: fixed;
+    right: 0;
+}
+
+.report-footer > span:last-child {
+    float: right;
+}
+
+.page-number::after {
+    content: counter(page);
+}
+
 h1 {
     color: #935aac;
     font-size: 15px;

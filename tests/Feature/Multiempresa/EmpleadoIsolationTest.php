@@ -81,7 +81,8 @@ class EmpleadoIsolationTest extends TestCase
         $puesto = Puesto::factory()->for($empresa)->create();
         $employee = Empleado::factory()->for($empresa)->create(['puesto_id' => $puesto->id]);
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($empresa)
+            ->actingAs($user)
             ->post(route('empresas.empleados.store', $empresa), [
                 ...$this->validEmployeePayload($puesto),
                 'nombre_usuario' => $employee->nombre_usuario,
@@ -129,7 +130,8 @@ class EmpleadoIsolationTest extends TestCase
             'puesto_id' => $secondPosition->id,
         ]);
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->get(route('empresas.empleados.index', $first))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -138,7 +140,8 @@ class EmpleadoIsolationTest extends TestCase
                 ->where('empleados.data.0.id', $firstEmployee->id),
             );
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->put(route('empresas.empleados.update', ['empresa' => $first, 'empleado' => $foreignEmployee]), ['nombre' => 'Manipulado'])
             ->assertNotFound();
 
@@ -163,7 +166,8 @@ class EmpleadoIsolationTest extends TestCase
         $firstPosition = Puesto::factory()->for($first)->create();
         $foreignPosition = Puesto::factory()->for($second)->create();
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->post(route('empresas.empleados.store', $first), [
                 ...$this->validEmployeePayload($foreignPosition),
                 'empresa_id' => $second->id,
@@ -187,14 +191,15 @@ class EmpleadoIsolationTest extends TestCase
         Storage::fake('local');
         [$user, $first] = $this->administratorWithTwoCompaniesInSameGroup();
         $position = Puesto::factory()->for($first)->create();
-        $type = TipoDocumentoEmpleado::factory()->create([
+        $type = TipoDocumentoEmpleado::factory()->for($first)->create([
             'nombre' => 'Contrato',
             'documentos_aceptados' => ['PDF'],
             'activo' => true,
             'es_renovable' => false,
         ]);
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->post(route('empresas.empleados.store', $first), [
                 ...$this->validEmployeePayload($position),
                 'avatar' => UploadedFile::fake()->image('avatar.jpg'),
@@ -245,7 +250,8 @@ class EmpleadoIsolationTest extends TestCase
         $foreignDocument = EmpleadoDocumento::factory()->for($foreignEmployee)->image()->create();
         Storage::disk('local')->put($foreignDocument->ruta, 'image');
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->get(route('empresas.empleados.documentos.preview', [
                 'empresa' => $first,
                 'empleado' => $foreignEmployee,
@@ -253,7 +259,8 @@ class EmpleadoIsolationTest extends TestCase
             ]))
             ->assertNotFound();
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->get(route('empresas.empleados.documentos.download', [
                 'empresa' => $first,
                 'empleado' => $foreignEmployee,
@@ -287,7 +294,8 @@ class EmpleadoIsolationTest extends TestCase
         $user = User::factory()->create();
         MembresiaEmpresa::factory()->for($empresa)->for($user)->create();
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($empresa)
+            ->actingAs($user)
             ->get(route('empresas.empleados.index', $empresa))
             ->assertForbidden();
 
@@ -325,7 +333,7 @@ class EmpleadoIsolationTest extends TestCase
     {
         return [
             'nombre' => 'Empleado Inicial',
-            'nombre_usuario' => 'empleado.inicial',
+            'nombre_usuario' => 'empleado-inicial',
             'correo' => 'empleado@gmail.com',
             'curp' => 'GODE561231HDFDBC09',
             'rfc' => 'GODE561231GR8',

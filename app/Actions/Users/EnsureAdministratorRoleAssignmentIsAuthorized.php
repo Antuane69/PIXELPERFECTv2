@@ -13,7 +13,7 @@ class EnsureAdministratorRoleAssignmentIsAuthorized
      */
     public function handle(User $actor, array $roleIds, ?User $target = null): void
     {
-        if ($actor->es_superadministrador_plataforma || $actor->hasRole('Administrador', 'web')) {
+        if ($actor->es_superadministrador_plataforma) {
             return;
         }
 
@@ -43,18 +43,28 @@ class EnsureAdministratorRoleAssignmentIsAuthorized
             ->where('guard_name', 'web')
             ->value('id');
 
-        if ($administratorRoleId === null) {
-            return;
+        if (
+            $administratorRoleId !== null
+            && $desiredRoleIds->contains((int) $administratorRoleId)
+            && ! $actor->hasRole('Administrador', 'web')
+        ) {
+            throw ValidationException::withMessages([
+                'roles' => 'Sólo un Administrador puede asignar el rol Administrador.',
+            ]);
         }
 
-        $assignsAdministrator = $desiredRoleIds->contains((int) $administratorRoleId);
+        $desiredPermissionIds = Role::query()
+            ->whereIn('id', $desiredRoleIds)
+            ->with('permissions:id')
+            ->get()
+            ->flatMap(static fn (Role $role) => $role->permissions->pluck('id'))
+            ->unique();
+        $actorPermissionIds = $actor->getAllPermissions()->pluck('id');
 
-        if (! $assignsAdministrator) {
-            return;
+        if ($desiredPermissionIds->diff($actorPermissionIds)->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'roles' => 'No puedes asignar roles con permisos superiores a los tuyos.',
+            ]);
         }
-
-        throw ValidationException::withMessages([
-            'roles' => 'Sólo un Administrador puede asignar el rol Administrador.',
-        ]);
     }
 }

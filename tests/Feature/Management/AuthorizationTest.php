@@ -8,7 +8,6 @@ use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\URL;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
@@ -25,7 +24,7 @@ class AuthorizationTest extends TestCase
 
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->empresa = Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail();
-        URL::defaults(['empresa' => $this->empresa->slug]);
+        $this->withEmpresaContext($this->empresa);
     }
 
     public function test_users_without_permissions_cannot_access_management_pages(): void
@@ -58,7 +57,7 @@ class AuthorizationTest extends TestCase
                 ->component('users/index')
                 ->where('auth.user.id', $administrator->id)
                 ->where('auth.user.roles', ['Administrador'])
-                ->has('auth.user.permissions', 17)
+                ->has('auth.user.permissions', 21)
                 ->missing('auth.user.password')
                 ->missing('auth.user.two_factor_secret'),
             );
@@ -72,22 +71,17 @@ class AuthorizationTest extends TestCase
         $administrator = Role::findByName('Administrador', 'web');
 
         $this->assertSame(23, Permission::query()->where('guard_name', 'web')->count());
-        $this->assertSame(17, $administrator->permissions()->count());
+        $this->assertSame(21, $administrator->permissions()->count());
     }
 
     public function test_dashboard_does_not_expose_counts_without_resource_permissions(): void
     {
         $user = User::factory()->create();
+        $this->addToEmpresa($user);
 
         $this->actingAs($user)
             ->get(route('dashboard'))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('dashboard')
-                ->where('stats.users', null)
-                ->missing('stats.empleados')
-                ->where('stats.tiposDocumentoActivos', null),
-            );
+            ->assertRedirect(route('empresas.inicio'));
     }
 
     public function test_non_administrator_cannot_assign_or_take_over_the_administrator_role(): void
@@ -144,6 +138,27 @@ class AuthorizationTest extends TestCase
             ->assertRedirect(route('empresas.roles.index'));
 
         $this->assertFalse($targetRole->fresh()?->hasPermissionTo($privilegedPermission));
+    }
+
+    public function test_delegated_user_manager_cannot_assign_roles_with_higher_permissions(): void
+    {
+        $manager = User::factory()->create();
+        $this->addToEmpresa($manager);
+        $manager->givePermissionTo(['users.create', 'users.assign_roles']);
+        $privilegedRole = Role::findOrCreate('Gestor privilegiado', 'web');
+        $privilegedRole->givePermissionTo('users.delete');
+
+        $this->actingAs($manager)
+            ->post(route('empresas.users.store'), [
+                'name' => 'Usuario escalado',
+                'email' => 'usuario-escalado@example.com',
+                'password' => 'Secure-password1!',
+                'password_confirmation' => 'Secure-password1!',
+                'roles' => [$privilegedRole->id],
+            ])
+            ->assertSessionHasErrors('roles');
+
+        $this->assertDatabaseMissing('users', ['email' => 'usuario-escalado@example.com']);
     }
 
     public function test_delegated_role_manager_cannot_expand_the_role_that_grants_their_management_permission(): void

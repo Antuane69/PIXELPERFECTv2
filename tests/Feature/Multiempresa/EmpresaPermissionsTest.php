@@ -41,7 +41,8 @@ class EmpresaPermissionsTest extends TestCase
         setPermissionsTeamId($second->id);
         $user->unsetRelation('roles')->unsetRelation('permissions')->assignRole($secondRole);
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($first)
+            ->actingAs($user)
             ->get(route('empresas.inicio', $first))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -49,7 +50,8 @@ class EmpresaPermissionsTest extends TestCase
                 ->where('auth.user.permissions', ['users.view']),
             );
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($second)
+            ->actingAs($user)
             ->get(route('empresas.inicio', $second))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -66,13 +68,13 @@ class EmpresaPermissionsTest extends TestCase
 
         $this->assertSame($empresa->id, $role->empresa_id);
         $this->assertTrue($role->esProtegido());
-        $this->assertCount(17, $role->permissions);
+        $this->assertCount(21, $role->permissions);
         $this->assertFalse($role->hasPermissionTo('logs.view'));
         $this->assertFalse($role->hasPermissionTo('logs.delete'));
-        $this->assertFalse($role->hasPermissionTo('tipos_documento.view'));
-        $this->assertFalse($role->hasPermissionTo('tipos_documento.create'));
-        $this->assertFalse($role->hasPermissionTo('tipos_documento.update'));
-        $this->assertFalse($role->hasPermissionTo('tipos_documento.delete'));
+        $this->assertTrue($role->hasPermissionTo('tipos_documento.view'));
+        $this->assertTrue($role->hasPermissionTo('tipos_documento.create'));
+        $this->assertTrue($role->hasPermissionTo('tipos_documento.update'));
+        $this->assertTrue($role->hasPermissionTo('tipos_documento.delete'));
     }
 
     public function test_same_role_name_can_exist_in_different_companies(): void
@@ -113,7 +115,8 @@ class EmpresaPermissionsTest extends TestCase
         setPermissionsTeamId($first->id);
         $administrator->assignRole($firstAdministratorRole);
 
-        $this->actingAs($administrator)
+        $this->withEmpresaContext($first)
+            ->actingAs($administrator)
             ->put(route('empresas.users.update', [
                 'empresa' => $first,
                 'user' => $foreignUser,
@@ -148,7 +151,8 @@ class EmpresaPermissionsTest extends TestCase
         setPermissionsTeamId($first->id);
         $administrator->assignRole($administratorRole);
 
-        $this->actingAs($administrator)
+        $this->withEmpresaContext($first)
+            ->actingAs($administrator)
             ->post(route('empresas.users.store', $first), [
                 'name' => 'Usuario aislado',
                 'email' => 'aislado@example.com',
@@ -167,15 +171,6 @@ class EmpresaPermissionsTest extends TestCase
             ])
             ->assertSessionHasErrors('permissions.0');
 
-        $globalCatalogPermission = Permission::findByName('tipos_documento.update', 'web');
-
-        $this->actingAs($administrator)
-            ->post(route('empresas.roles.store', $first), [
-                'name' => 'Rol global inseguro',
-                'permissions' => [$globalCatalogPermission->id],
-            ])
-            ->assertSessionHasErrors('permissions.0');
-
         $this->assertDatabaseMissing('users', ['email' => 'aislado@example.com']);
         $this->assertDatabaseMissing('roles', [
             'empresa_id' => $first->id,
@@ -183,7 +178,7 @@ class EmpresaPermissionsTest extends TestCase
         ]);
     }
 
-    public function test_request_without_company_resets_previous_permission_context(): void
+    public function test_company_context_persists_when_visiting_dashboard(): void
     {
         $empresa = Empresa::factory()->activa()->create();
         $role = $this->createRole($empresa, 'Consulta', ['users.view']);
@@ -193,7 +188,8 @@ class EmpresaPermissionsTest extends TestCase
         setPermissionsTeamId($empresa->id);
         $user->assignRole($role);
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($empresa)
+            ->actingAs($user)
             ->get(route('empresas.inicio', $empresa))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('auth.user.permissions', ['users.view']),
@@ -201,10 +197,12 @@ class EmpresaPermissionsTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('dashboard'))
+            ->assertRedirect(route('empresas.inicio'));
+
+        $this->get(route('empresas.inicio'))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('auth.user.permissions', [])
-                ->where('empresas.activa', null),
-            );
+                ->where('auth.user.permissions', ['users.view'])
+                ->where('empresas.activa.id', $empresa->id));
     }
 
     public function test_platform_superadministrator_can_access_any_company_without_membership(): void
@@ -212,7 +210,8 @@ class EmpresaPermissionsTest extends TestCase
         $empresa = Empresa::factory()->vencida()->create();
         $user = User::factory()->superadministradorPlataforma()->create();
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($empresa)
+            ->actingAs($user)
             ->get(route('empresas.inicio', $empresa))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -232,7 +231,8 @@ class EmpresaPermissionsTest extends TestCase
         setPermissionsTeamId($empresa->id);
         $user->assignRole($administratorRole);
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($empresa)
+            ->actingAs($user)
             ->get(route('empresas.puestos.index', $empresa))
             ->assertOk();
 

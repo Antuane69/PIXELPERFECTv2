@@ -27,86 +27,69 @@ class GlobalDocumentTypeCatalogTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
     }
 
-    public function test_global_catalog_is_visible_from_every_company_employee_module(): void
+    public function test_document_type_catalog_is_isolated_by_company(): void
     {
         $first = Empresa::factory()->activa()->create();
         $second = Empresa::factory()->activa()->create();
         $firstAdministrator = $this->companyAdministrator($first);
         $secondAdministrator = $this->companyAdministrator($second);
-        $activeType = TipoDocumentoEmpleado::factory()->create([
-            'nombre' => 'Identificación global',
+        $firstType = TipoDocumentoEmpleado::factory()->for($first)->create([
+            'nombre' => 'Identificación empresa uno',
             'activo' => true,
         ]);
-        $inactiveType = TipoDocumentoEmpleado::factory()->inactive()->create([
-            'nombre' => 'Documento histórico global',
+        $secondType = TipoDocumentoEmpleado::factory()->for($second)->create([
+            'nombre' => 'Identificación empresa dos',
         ]);
 
-        foreach ([[$first, $firstAdministrator], [$second, $secondAdministrator]] as [$empresa, $administrator]) {
-            $this->actingAs($administrator)
-                ->get(route('empresas.empleados.index', $empresa))
-                ->assertOk()
-                ->assertInertia(fn (Assert $page) => $page
-                    ->component('empleados/index')
-                    ->has('tiposDocumento', 2)
-                    ->where('tiposDocumento.0.id', $inactiveType->id)
-                    ->where('tiposDocumento.0.activo', false)
-                    ->where('tiposDocumento.1.id', $activeType->id)
-                    ->where('tiposDocumento.1.activo', true),
-                );
-        }
+        $this->withEmpresaContext($first)
+            ->actingAs($firstAdministrator)
+            ->get(route('empresas.empleados.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('empleados/index')
+                ->has('tiposDocumento', 1)
+                ->where('tiposDocumento.0.id', $firstType->id));
+
+        $this->withEmpresaContext($second)
+            ->actingAs($secondAdministrator)
+            ->get(route('empresas.empleados.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('tiposDocumento', 1)
+                ->where('tiposDocumento.0.id', $secondType->id));
     }
 
-    public function test_company_administrator_cannot_modify_global_catalog_even_with_legacy_permissions(): void
+    public function test_company_administrator_can_manage_only_its_document_types(): void
     {
         $empresa = Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail();
         $administrator = $this->companyAdministrator($empresa);
-        $type = TipoDocumentoEmpleado::factory()->create();
-        $archivedType = TipoDocumentoEmpleado::factory()->create();
-        $archivedType->delete();
+        $foreignEmpresa = Empresa::factory()->activa()->create();
+        $foreignType = TipoDocumentoEmpleado::factory()->for($foreignEmpresa)->create();
 
-        setPermissionsTeamId($empresa->id);
-        $administrator->givePermissionTo([
-            'tipos_documento.view',
-            'tipos_documento.create',
-            'tipos_documento.update',
-            'tipos_documento.delete',
+        $this->withEmpresaContext($empresa)
+            ->actingAs($administrator)
+            ->post(route('empresas.tipos-documento-empleados.store'), [
+                ...$this->validPayload(),
+                'nombre' => 'Documento empresarial',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('tipo_documento_empleados', [
+            'empresa_id' => $empresa->id,
+            'nombre' => 'Documento empresarial',
         ]);
 
-        $this->actingAs($administrator)
-            ->get(route('platform.tipos-documento-empleados.index'))
-            ->assertForbidden();
-
-        $this->actingAs($administrator)
-            ->post(route('platform.tipos-documento-empleados.store'), $this->validPayload())
-            ->assertForbidden();
-
-        $this->actingAs($administrator)
-            ->put(route('platform.tipos-documento-empleados.update', $type), $this->validPayload())
-            ->assertForbidden();
-
-        $this->actingAs($administrator)
-            ->delete(route('platform.tipos-documento-empleados.destroy', $type))
-            ->assertForbidden();
-
-        $this->actingAs($administrator)
-            ->patch(route('platform.tipos-documento-empleados.restore', $archivedType))
-            ->assertForbidden();
-
-        $this->actingAs($administrator)
-            ->post(route('platform.reportes.tipos-documento-empleados.exportar'), ['formato' => 'xlsx'])
-            ->assertForbidden();
-
-        $this->actingAs($administrator)
-            ->post(route('reportes.exportar', 'tipos-documento-empleados'), ['formato' => 'xlsx'])
-            ->assertForbidden();
+        $this->put(
+            route('empresas.tipos-documento-empleados.update', $foreignType),
+            $this->validPayload(),
+        )->assertNotFound();
     }
 
     public function test_deactivation_preserves_historical_employee_document_references(): void
     {
         $empresa = Empresa::factory()->activa()->create();
         $administrator = $this->companyAdministrator($empresa);
-        $platformAdministrator = User::factory()->superadministradorPlataforma()->create();
-        $type = TipoDocumentoEmpleado::factory()->create([
+        $type = TipoDocumentoEmpleado::factory()->for($empresa)->create([
             'nombre' => 'Contrato histórico',
             'activo' => true,
         ]);
@@ -117,8 +100,9 @@ class GlobalDocumentTypeCatalogTest extends TestCase
             'tipo_documento_empleado_id' => $type->id,
         ]);
 
-        $this->actingAs($platformAdministrator)
-            ->put(route('platform.tipos-documento-empleados.update', $type), [
+        $this->withEmpresaContext($empresa)
+            ->actingAs($administrator)
+            ->put(route('empresas.tipos-documento-empleados.update', $type), [
                 ...$this->validPayload(),
                 'nombre' => $type->nombre,
                 'activo' => false,
@@ -126,7 +110,7 @@ class GlobalDocumentTypeCatalogTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->actingAs($administrator)
-            ->get(route('empresas.empleados.index', $empresa))
+            ->get(route('empresas.empleados.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('tiposDocumento.0.id', $type->id)
@@ -143,26 +127,28 @@ class GlobalDocumentTypeCatalogTest extends TestCase
         ]);
     }
 
-    public function test_platform_catalog_changes_are_logged_without_company_ownership(): void
+    public function test_document_type_changes_are_logged_with_company_ownership(): void
     {
-        $platformAdministrator = User::factory()->superadministradorPlataforma()->create();
+        $empresa = Empresa::factory()->activa()->create();
+        $administrator = $this->companyAdministrator($empresa);
 
-        $this->actingAs($platformAdministrator)
-            ->post(route('platform.tipos-documento-empleados.store'), [
+        $this->withEmpresaContext($empresa)
+            ->actingAs($administrator)
+            ->post(route('empresas.tipos-documento-empleados.store'), [
                 ...$this->validPayload(),
-                'nombre' => 'Catálogo de plataforma',
+                'nombre' => 'Catálogo empresarial',
             ])
             ->assertSessionHasNoErrors();
 
-        $type = TipoDocumentoEmpleado::query()->where('nombre', 'Catálogo de plataforma')->firstOrFail();
+        $type = TipoDocumentoEmpleado::query()->where('nombre', 'Catálogo empresarial')->firstOrFail();
         $activity = Activity::query()
             ->where('subject_type', TipoDocumentoEmpleado::class)
             ->where('subject_id', $type->id)
             ->latest('id')
             ->firstOrFail();
 
-        $this->assertNull($activity->empresa_id);
-        $this->assertSame($platformAdministrator->id, $activity->causer_id);
+        $this->assertSame($empresa->id, $activity->empresa_id);
+        $this->assertSame($administrator->id, $activity->causer_id);
     }
 
     private function companyAdministrator(Empresa $empresa): User

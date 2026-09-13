@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\TipoDocumentoEmpleados\StoreTipoDocumentoEmpleadoRequest;
 use App\Http\Requests\TipoDocumentoEmpleados\UpdateTipoDocumentoEmpleadoRequest;
 use App\Models\TipoDocumentoEmpleado;
+use App\Services\Empresas\EmpresaContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,11 +25,14 @@ class TipoDocumentoEmpleadoController extends Controller
         'page',
     ];
 
+    public function __construct(private readonly EmpresaContext $empresaContext) {}
+
     /**
      * Display a paginated employee document type listing.
      */
     public function index(Request $request): Response
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('viewAny', TipoDocumentoEmpleado::class);
 
         $search = $request->string('search')->squish()->toString();
@@ -38,6 +42,7 @@ class TipoDocumentoEmpleadoController extends Controller
         $tiposDocumento = TipoDocumentoEmpleado::query()
             ->select([
                 'id',
+                'empresa_id',
                 'nombre',
                 'es_renovable',
                 'frecuencia_cantidad',
@@ -46,6 +51,7 @@ class TipoDocumentoEmpleadoController extends Controller
                 'activo',
                 'deleted_at',
             ])
+            ->whereBelongsTo($empresa)
             ->when($archivados, fn (Builder $query) => $query->onlyTrashed())
             ->when($search !== '', fn (Builder $query) => $query->where('nombre', 'like', "%{$search}%"))
             ->when(
@@ -87,9 +93,13 @@ class TipoDocumentoEmpleadoController extends Controller
      */
     public function store(StoreTipoDocumentoEmpleadoRequest $request): RedirectResponse
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('create', TipoDocumentoEmpleado::class);
 
-        TipoDocumentoEmpleado::query()->create($request->validated());
+        TipoDocumentoEmpleado::query()->create([
+            'empresa_id' => $empresa->id,
+            ...$request->validated(),
+        ]);
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -98,7 +108,7 @@ class TipoDocumentoEmpleadoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'platform.tipos-documento-empleados.index',
+            'empresas.tipos-documento-empleados.index',
             self::INDEX_QUERY_PARAMETERS,
         );
     }
@@ -121,7 +131,7 @@ class TipoDocumentoEmpleadoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'platform.tipos-documento-empleados.index',
+            'empresas.tipos-documento-empleados.index',
             self::INDEX_QUERY_PARAMETERS,
         );
     }
@@ -129,8 +139,10 @@ class TipoDocumentoEmpleadoController extends Controller
     /**
      * Soft delete the specified employee document type when it is unused.
      */
-    public function destroy(Request $request, TipoDocumentoEmpleado $tipoDocumentoEmpleado): RedirectResponse
-    {
+    public function destroy(
+        Request $request,
+        TipoDocumentoEmpleado $tipoDocumentoEmpleado,
+    ): RedirectResponse {
         Gate::authorize('delete', $tipoDocumentoEmpleado);
 
         if ($tipoDocumentoEmpleado->documentos()->exists()) {
@@ -148,7 +160,7 @@ class TipoDocumentoEmpleadoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'platform.tipos-documento-empleados.index',
+            'empresas.tipos-documento-empleados.index',
             self::INDEX_QUERY_PARAMETERS,
         );
     }
@@ -156,8 +168,10 @@ class TipoDocumentoEmpleadoController extends Controller
     /**
      * Restore the specified archived employee document type.
      */
-    public function restore(Request $request, TipoDocumentoEmpleado $tipoDocumentoEmpleado): RedirectResponse
-    {
+    public function restore(
+        Request $request,
+        TipoDocumentoEmpleado $tipoDocumentoEmpleado,
+    ): RedirectResponse {
         Gate::authorize('restore', $tipoDocumentoEmpleado);
 
         $tipoDocumentoEmpleado->restore();
@@ -169,7 +183,7 @@ class TipoDocumentoEmpleadoController extends Controller
 
         return $this->redirectToResourceIndex(
             $request,
-            'platform.tipos-documento-empleados.index',
+            'empresas.tipos-documento-empleados.index',
             self::INDEX_QUERY_PARAMETERS,
             ['archivados' => true],
         );

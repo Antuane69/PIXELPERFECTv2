@@ -2,10 +2,14 @@
 
 use App\Http\Controllers\Admin\EmpresaController as AdminEmpresaController;
 use App\Http\Controllers\Admin\EmpresaModuloController;
+use App\Http\Controllers\Admin\ModuloController as AdminModuloController;
+use App\Http\Controllers\Admin\PermissionController as AdminPermissionController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
+use App\Http\Controllers\Admin\PlatformUserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DownloadEmpleadoDocumentoController;
 use App\Http\Controllers\EmpleadoController;
+use App\Http\Controllers\EmpresaContextController;
 use App\Http\Controllers\EmpresaDashboardController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\PuestoController;
@@ -17,19 +21,19 @@ use App\Http\Controllers\UserController;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
-Route::get('/', static function (): Response|RedirectResponse {
-    if (auth()->check()) {
-        return to_route('dashboard');
-    }
-
-    return Inertia::render('welcome');
-})->name('home');
+Route::get('/', static fn (): RedirectResponse => to_route('login'))->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
-    Route::prefix('admin')->name('platform.')->group(function (): void {
+    Route::get('seleccionar-empresa', [EmpresaContextController::class, 'create'])
+        ->name('empresa-contexto.create');
+    Route::post('seleccionar-empresa', [EmpresaContextController::class, 'store'])
+        ->name('empresa-contexto.store');
+    Route::delete('seleccionar-empresa', [EmpresaContextController::class, 'destroy'])
+        ->name('empresa-contexto.destroy');
+
+    Route::prefix('admin')->name('platform.')->middleware('platform.admin')->group(function (): void {
         Route::patch('planes/{plan}/restaurar', [AdminPlanController::class, 'restore'])
             ->withTrashed()
             ->name('planes.restore');
@@ -37,30 +41,37 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
             ->parameters(['planes' => 'plan'])
             ->only(['index', 'store', 'update', 'destroy']);
         Route::resource('empresas', AdminEmpresaController::class)->only(['index', 'store']);
-        Route::put('empresas/{empresa:slug}/modulos', EmpresaModuloController::class)
+        Route::put('empresas/{empresa:id}/modulos', EmpresaModuloController::class)
             ->name('empresas.modulos.update');
-        Route::post(
-            'reportes/tipos-documento-empleados/exportar',
-            [ExportController::class, 'exportarTiposDocumentoEmpleado'],
-        )->name('reportes.tipos-documento-empleados.exportar');
-        Route::patch(
-            'tipos-documento-empleados/{tipoDocumentoEmpleado}/restaurar',
-            [TipoDocumentoEmpleadoController::class, 'restore'],
-        )->withTrashed()->name('tipos-documento-empleados.restore');
-        Route::resource('tipos-documento-empleados', TipoDocumentoEmpleadoController::class)
-            ->parameters(['tipos-documento-empleados' => 'tipoDocumentoEmpleado'])
+        Route::get('usuarios', PlatformUserController::class)->name('usuarios.index');
+        Route::post('usuarios', [PlatformUserController::class, 'store'])->name('usuarios.store');
+        Route::put('usuarios/{user}', [PlatformUserController::class, 'update'])->name('usuarios.update');
+        Route::delete('usuarios/{user}', [PlatformUserController::class, 'destroy'])->name('usuarios.destroy');
+        Route::resource('modulos', AdminModuloController::class)
+            ->only(['index', 'store', 'update', 'destroy']);
+        Route::resource('permisos', AdminPermissionController::class)
+            ->parameters(['permisos' => 'permission'])
             ->only(['index', 'store', 'update', 'destroy']);
     });
 
-    Route::prefix('app/{empresa:slug}')
-        ->name('empresas.')
+    Route::name('empresas.')
         ->middleware('empresa.activa')
         ->group(function (): void {
-            Route::get('/', EmpresaDashboardController::class)->name('inicio');
+            Route::get('inicio', EmpresaDashboardController::class)->name('inicio');
             Route::scopeBindings()->group(function (): void {
                 Route::middleware('modulo.habilitado:usuarios')->group(function (): void {
-                    Route::resource('users', UserController::class)
+                    Route::resource('usuarios', UserController::class)
+                        ->parameters(['usuarios' => 'user'])
+                        ->names('users')
                         ->only(['index', 'store', 'update', 'destroy']);
+                    Route::patch(
+                        'usuarios/{user}/two-factor',
+                        [UserController::class, 'updateTwoFactor'],
+                    )->name('users.two-factor');
+                    Route::post(
+                        'usuarios/{user}/password-reset',
+                        [UserController::class, 'sendPasswordReset'],
+                    )->name('users.password-reset');
                 });
                 Route::middleware('modulo.habilitado:roles')->group(function (): void {
                     Route::resource('roles', RoleController::class)
@@ -89,6 +100,18 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
                         'empleados/{empleado}/documentos/{documento}/download',
                         DownloadEmpleadoDocumentoController::class,
                     )->name('empleados.documentos.download');
+                    Route::post(
+                        'reportes/tipos-documento-empleados/exportar',
+                        [ExportController::class, 'exportarTiposDocumentoEmpleado'],
+                    )->name('reportes.tipos-documento-empleados.exportar');
+                    Route::patch(
+                        'documentos/{tipoDocumentoEmpleado}/restaurar',
+                        [TipoDocumentoEmpleadoController::class, 'restore'],
+                    )->withTrashed()->name('tipos-documento-empleados.restore');
+                    Route::resource('documentos', TipoDocumentoEmpleadoController::class)
+                        ->parameters(['documentos' => 'tipoDocumentoEmpleado'])
+                        ->names('tipos-documento-empleados')
+                        ->only(['index', 'store', 'update', 'destroy']);
                 });
             });
 
@@ -108,10 +131,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
-    Route::get('logs', static fn (): SymfonyResponse => Inertia::location(route('log-viewer.index')))
-        ->name('logs.index');
+    Route::middleware('platform.admin')->group(function (): void {
+        Route::get('logs', static fn (): SymfonyResponse => Inertia::location(route('log-viewer.index')))
+            ->name('logs.index');
+    });
 
-    Route::middleware('empresa.inicial')->group(function (): void {
+    Route::middleware('empresa.activa')->group(function (): void {
         Route::post('reportes/{reporte}/exportar', [ExportController::class, 'exportar'])
             ->name('reportes.exportar');
     });

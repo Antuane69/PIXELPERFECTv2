@@ -16,12 +16,25 @@ class DashboardTest extends TestCase
         $response->assertRedirect(route('login'));
     }
 
-    public function test_authenticated_users_can_visit_the_dashboard()
+    public function test_normal_users_without_company_context_are_redirected_to_company_selection()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
 
         $response = $this->get(route('dashboard'));
+
+        $response->assertRedirect(route('empresa-contexto.create'));
+    }
+
+    public function test_platform_administrators_can_visit_the_dashboard()
+    {
+        $user = User::factory()->create([
+            'es_superadministrador_plataforma' => true,
+        ]);
+        $this->actingAs($user);
+
+        $response = $this->get(route('dashboard'));
+
         $response->assertOk();
     }
 }

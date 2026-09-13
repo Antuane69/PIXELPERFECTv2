@@ -3,6 +3,7 @@
 namespace App\Http\Requests\TipoDocumentoEmpleados;
 
 use App\Models\TipoDocumentoEmpleado;
+use App\Services\Empresas\EmpresaContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -42,7 +43,9 @@ class UpdateTipoDocumentoEmpleadoRequest extends FormRequest
     {
         $tipoDocumentoEmpleado = $this->route('tipoDocumentoEmpleado')
             ?? $this->route('tipo_documento_empleado');
-        $uniqueName = Rule::unique(TipoDocumentoEmpleado::class, 'nombre');
+        $empresa = app(EmpresaContext::class)->empresaRequerida();
+        $uniqueName = Rule::unique(TipoDocumentoEmpleado::class, 'nombre')
+            ->where('empresa_id', $empresa->id);
 
         if ($tipoDocumentoEmpleado instanceof TipoDocumentoEmpleado) {
             $uniqueName->ignore($tipoDocumentoEmpleado);

@@ -1,4 +1,3 @@
-import { ColorPicker } from 'antd';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +24,7 @@ export function PlanFormFields({
     iconos: PlanIconName[];
     errors: Record<string, string>;
 }) {
+    const [nombre, setNombre] = useState(plan?.nombre ?? '');
     const [color, setColor] = useState(plan?.color ?? '#7C3AED');
     const [icono, setIcono] = useState<PlanIconName>(
         plan?.icono ?? 'CrownOutlined',
@@ -38,7 +38,8 @@ export function PlanFormFields({
                     <Input
                         id="plan-nombre"
                         name="nombre"
-                        defaultValue={plan?.nombre}
+                        value={nombre}
+                        onChange={(event) => setNombre(event.target.value)}
                         maxLength={120}
                         required
                         autoFocus
@@ -46,7 +47,7 @@ export function PlanFormFields({
                     <InputError message={errors.nombre} />
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-2 sm:col-span-2">
                     <Label htmlFor="plan-precio">Precio mensual (MXN)</Label>
                     <Input
                         id="plan-precio"
@@ -61,7 +62,7 @@ export function PlanFormFields({
                     <InputError message={errors.precio_mensual} />
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-2 sm:col-span-2">
                     <Label htmlFor="plan-limite-usuarios">
                         Límite de usuarios
                     </Label>
@@ -88,15 +89,16 @@ export function PlanFormFields({
                     </legend>
                     <input type="hidden" name="color" value={color} />
                     <div className="flex h-9 items-center gap-3">
-                        <ColorPicker
+                        <input
+                            type="color"
                             value={color}
-                            format="hex"
-                            disabledAlpha
-                            onChange={(value) =>
-                                setColor(value.toHexString().toUpperCase())
+                            onChange={(event) =>
+                                setColor(event.target.value.toUpperCase())
                             }
+                            aria-label="Seleccionar color del plan"
+                            className="size-9 cursor-pointer rounded-md border border-input bg-transparent p-1"
                         />
-                        <span className="font-mono text-sm">{color}</span>
+                        <output className="font-mono text-sm">{color}</output>
                     </div>
                     <InputError message={errors.color} />
                 </fieldset>
@@ -145,6 +147,28 @@ export function PlanFormFields({
                     <InputError message={errors.periodo_gracia_dias} />
                 </div>
 
+                <div className="grid gap-2">
+                    <span className="text-sm font-medium">Vista previa</span>
+                    <div className="flex items-center">
+                        <span
+                            className="inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold shadow-sm"
+                            style={{
+                                backgroundColor: color,
+                                color: getPlanTagTextColor(color),
+                            }}
+                            aria-label={`Vista previa del plan ${nombre.trim() || 'sin nombre'}`}
+                        >
+                            <PlanIcon name={icono} className="text-base" />
+                            <span className="truncate">
+                                {nombre.trim() || 'Nombre del plan'}
+                            </span>
+                        </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        Así se mostrará el identificador visual del plan.
+                    </p>
+                </div>
+
                 <div className="grid gap-2 sm:col-span-2">
                     <Label htmlFor="plan-modulos">Módulos incluidos</Label>
                     <Textarea
@@ -178,4 +202,26 @@ export function PlanFormFields({
             <InputError message={errors.activo} />
         </div>
     );
+}
+
+function getPlanTagTextColor(color: string): string {
+    const hex = color.replace('#', '');
+    const normalizedHex =
+        hex.length === 3
+            ? hex
+                  .split('')
+                  .map((character) => `${character}${character}`)
+                  .join('')
+            : hex;
+
+    if (!/^[0-9A-Fa-f]{6}$/.test(normalizedHex)) {
+        return '#FFFFFF';
+    }
+
+    const red = Number.parseInt(normalizedHex.slice(0, 2), 16);
+    const green = Number.parseInt(normalizedHex.slice(2, 4), 16);
+    const blue = Number.parseInt(normalizedHex.slice(4, 6), 16);
+    const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+
+    return luminance > 155 ? '#241C2A' : '#FFFFFF';
 }

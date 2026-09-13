@@ -6,6 +6,8 @@ use Illuminate\Support\Collection;
 
 class ExportConfig
 {
+    private const DEFAULT_LOGO_PATH = 'brand/pixel-perfect-banner.png';
+
     private string $title = 'Reporte';
 
     private ?string $subtitle = null;
@@ -39,6 +41,12 @@ class ExportConfig
     private bool $fixedPdfTableLayout = false;
 
     private ?string $logoPath = null;
+
+    private ?string $logoContents = null;
+
+    private ?string $logoMimeType = null;
+
+    private ?string $brandName = null;
 
     private function __construct()
     {
@@ -150,6 +158,24 @@ class ExportConfig
     public function logo(string $path): self
     {
         $this->logoPath = $path;
+        $this->logoContents = null;
+        $this->logoMimeType = null;
+
+        return $this;
+    }
+
+    public function logoContents(?string $contents, ?string $mimeType): self
+    {
+        $this->logoPath = null;
+        $this->logoContents = $contents;
+        $this->logoMimeType = $mimeType;
+
+        return $this;
+    }
+
+    public function brandName(?string $name): self
+    {
+        $this->brandName = $name;
 
         return $this;
     }
@@ -202,11 +228,66 @@ class ExportConfig
         return $this->showIndex;
     }
 
+    public function getLogoContents(): ?string
+    {
+        if ($this->logoContents !== null) {
+            return $this->logoContents;
+        }
+
+        $path = $this->logoPath ?? public_path(self::DEFAULT_LOGO_PATH);
+
+        if (! is_file($path)) {
+            return null;
+        }
+
+        $contents = file_get_contents($path);
+
+        return is_string($contents) && $contents !== '' ? $contents : null;
+    }
+
+    public function getLogoMimeType(): ?string
+    {
+        if ($this->logoMimeType !== null) {
+            return $this->logoMimeType;
+        }
+
+        $path = $this->logoPath ?? public_path(self::DEFAULT_LOGO_PATH);
+
+        if (! is_file($path)) {
+            return null;
+        }
+
+        $mimeType = mime_content_type($path);
+
+        return is_string($mimeType) ? $mimeType : null;
+    }
+
+    public function getLogoDataUri(): ?string
+    {
+        $contents = $this->getLogoContents();
+        $mimeType = $this->getLogoMimeType();
+
+        if ($contents === null || $mimeType === null) {
+            return null;
+        }
+
+        return "data:{$mimeType};base64,".base64_encode($contents);
+    }
+
     public function getLogoPath(): ?string
     {
-        $path = $this->logoPath ?? public_path('brand/pixel-perfect-banner.png');
+        if ($this->logoPath !== null) {
+            return is_file($this->logoPath) ? $this->logoPath : null;
+        }
 
-        return is_file($path) ? $path : null;
+        return $this->logoContents === null
+            ? (is_file(public_path(self::DEFAULT_LOGO_PATH)) ? public_path(self::DEFAULT_LOGO_PATH) : null)
+            : null;
+    }
+
+    public function getBrandName(): string
+    {
+        return $this->brandName ?? 'Reporte';
     }
 
     public function usesFixedPdfTableLayout(): bool

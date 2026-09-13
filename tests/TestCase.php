@@ -2,11 +2,20 @@
 
 namespace Tests;
 
+use App\Models\Empresa;
+use App\Services\Empresas\EmpresaContext;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Laravel\Fortify\Features;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function withEmpresaContext(Empresa|int $empresa): static
+    {
+        return $this->withSession([
+            EmpresaContext::SESSION_KEY => $empresa instanceof Empresa ? $empresa->id : $empresa,
+        ]);
+    }
+
     /**
      * @param  array<string, bool|float|int|string>  $expectedQuery
      */

@@ -10,7 +10,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
+use PhpOffice\PhpSpreadsheet\Worksheet\MemoryDrawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use RuntimeException;
@@ -96,16 +96,28 @@ class ExcelDriver
     private function writeHeader(Worksheet $sheet): void
     {
         $lastColumn = $this->lastColumn();
-        $logoPath = $this->config->getLogoPath();
+        $logoContents = $this->config->getLogoContents();
 
-        if ($logoPath !== null) {
-            $drawing = new Drawing;
-            $drawing->setName('Logo de Pixel Perfect');
-            $drawing->setPath($logoPath);
+        if ($logoContents !== null) {
+            try {
+                $drawing = MemoryDrawing::fromString($logoContents);
+            } catch (\Throwable $exception) {
+                throw new RuntimeException('El logo de la empresa no pudo agregarse al reporte.', 0, $exception);
+            }
+
+            $drawing->setName('Logo de la empresa');
+            $drawing->setDescription($this->config->getBrandName());
             $drawing->setHeight(55);
             $drawing->setCoordinates('A1');
             $drawing->setWorksheet($sheet);
             $sheet->getRowDimension(1)->setRowHeight(44);
+        } else {
+            $sheet->mergeCells("A1:{$lastColumn}1");
+            $sheet->setCellValue('A1', $this->config->getBrandName());
+            $sheet->getStyle("A1:{$lastColumn}1")->applyFromArray([
+                'font' => ['bold' => true, 'size' => 11, 'color' => ['argb' => self::COLOR_PRIMARY]],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT],
+            ]);
         }
 
         $sheet->mergeCells("A2:{$lastColumn}2");

@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Puestos\StorePuestoRequest;
 use App\Http\Requests\Puestos\UpdatePuestoRequest;
-use App\Models\Empresa;
 use App\Models\Puesto;
+use App\Services\Empresas\EmpresaContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,11 +18,14 @@ class PuestoController extends Controller
 {
     private const INDEX_QUERY_PARAMETERS = ['search', 'activo', 'archivados', 'per_page', 'page'];
 
+    public function __construct(private readonly EmpresaContext $empresaContext) {}
+
     /**
      * Display a paginated position listing.
      */
-    public function index(Request $request, Empresa $empresa): Response
+    public function index(Request $request): Response
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('viewAny', Puesto::class);
 
         $search = $request->string('search')->squish()->toString();
@@ -66,8 +69,9 @@ class PuestoController extends Controller
     /**
      * Store a newly created position.
      */
-    public function store(StorePuestoRequest $request, Empresa $empresa): RedirectResponse
+    public function store(StorePuestoRequest $request): RedirectResponse
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('create', Puesto::class);
 
         Puesto::query()->create([
@@ -81,14 +85,13 @@ class PuestoController extends Controller
             $request,
             'empresas.puestos.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa],
         );
     }
 
     /**
      * Update the specified position.
      */
-    public function update(UpdatePuestoRequest $request, Empresa $empresa, Puesto $puesto): RedirectResponse
+    public function update(UpdatePuestoRequest $request, Puesto $puesto): RedirectResponse
     {
         Gate::authorize('update', $puesto);
 
@@ -100,14 +103,13 @@ class PuestoController extends Controller
             $request,
             'empresas.puestos.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa],
         );
     }
 
     /**
      * Soft delete the specified position when it is unused.
      */
-    public function destroy(Request $request, Empresa $empresa, Puesto $puesto): RedirectResponse
+    public function destroy(Request $request, Puesto $puesto): RedirectResponse
     {
         Gate::authorize('delete', $puesto);
 
@@ -125,14 +127,13 @@ class PuestoController extends Controller
             $request,
             'empresas.puestos.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa],
         );
     }
 
     /**
      * Restore the specified archived position.
      */
-    public function restore(Request $request, Empresa $empresa, Puesto $puesto): RedirectResponse
+    public function restore(Request $request, Puesto $puesto): RedirectResponse
     {
         Gate::authorize('restore', $puesto);
 
@@ -144,7 +145,7 @@ class PuestoController extends Controller
             $request,
             'empresas.puestos.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa, 'archivados' => true],
+            ['archivados' => true],
         );
     }
 

@@ -6,14 +6,18 @@ use App\Models\Empresa;
 use App\Models\MembresiaEmpresa;
 use App\Models\Puesto;
 use App\Models\User;
+use App\Services\ImageCompressor;
+use App\Services\Reportes\ExportConfig;
 use App\Services\Reportes\ExportService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Date;
 use Mockery\MockInterface;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Tests\TestCase;
+use ZipArchive;
 
 class ExportarReporteTest extends TestCase
 {
@@ -34,6 +38,7 @@ class ExportarReporteTest extends TestCase
             ->for($this->empresa)
             ->for($this->administrator)
             ->create();
+        $this->withEmpresaContext($this->empresa);
         $this->administrator->assignRole('Administrador');
         Date::setTestNow('2026-08-12 10:00:00');
     }
@@ -79,7 +84,7 @@ class ExportarReporteTest extends TestCase
     {
         $this->mock(ExportService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('excelFromQuery')
-                ->times(4)
+                ->times(5)
                 ->andReturnUsing(function (): BinaryFileResponse {
                     $path = tempnam(sys_get_temp_dir(), 'reporte-prueba-');
                     file_put_contents($path, 'xlsx');
@@ -92,6 +97,7 @@ class ExportarReporteTest extends TestCase
             'empleados',
             'puestos',
             'roles',
+            'tipos-documento-empleados',
             'usuarios',
         ] as $reporte) {
             $this->actingAs($this->administrator)
@@ -101,7 +107,7 @@ class ExportarReporteTest extends TestCase
         }
     }
 
-    public function test_platform_administrator_can_request_global_document_type_report(): void
+    public function test_platform_administrator_can_request_company_document_type_report(): void
     {
         $platformAdministrator = User::factory()->superadministradorPlataforma()->create();
 
@@ -117,7 +123,7 @@ class ExportarReporteTest extends TestCase
         });
 
         $this->actingAs($platformAdministrator)
-            ->post(route('platform.reportes.tipos-documento-empleados.exportar'), ['formato' => 'xlsx'])
+            ->post(route('empresas.reportes.tipos-documento-empleados.exportar'), ['formato' => 'xlsx'])
             ->assertOk()
             ->assertDownload('reporte.xlsx');
     }
@@ -143,6 +149,7 @@ class ExportarReporteTest extends TestCase
         $spreadsheet = IOFactory::load($response->baseResponse->getFile()->getPathname());
         $sheet = $spreadsheet->getActiveSheet();
 
+        $this->assertCount(1, $sheet->getDrawingCollection());
         $this->assertSame('Nombre', (string) $sheet->getCell('B5')->getValue());
         $this->assertSame('Needle Activo', (string) $sheet->getCell('B6')->getValue());
         $this->assertSame('', (string) $sheet->getCell('B7')->getValue());
@@ -154,8 +161,56 @@ class ExportarReporteTest extends TestCase
         $spreadsheet->disconnectWorksheets();
     }
 
+    public function test_excel_export_embeds_active_company_logo(): void
+    {
+        $logo = UploadedFile::fake()->image('empresa.png', 180, 90);
+        $compressedLogo = app(ImageCompressor::class)->compressIfImage($logo);
+        $this->assertNotNull($compressedLogo);
+
+        $this->empresa->forceFill([
+            'logo' => $compressedLogo['contents'],
+            'logo_mime_type' => $compressedLogo['mime_type'],
+        ])->save();
+
+        $response = $this->actingAs($this->administrator)
+            ->post(route('reportes.exportar', 'puestos'), ['formato' => 'xlsx'])
+            ->assertOk()
+            ->assertDownload('puestos_20260812_100000.xlsx');
+
+        $spreadsheet = IOFactory::load($response->baseResponse->getFile()->getPathname());
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $this->assertCount(1, $sheet->getDrawingCollection());
+        $this->assertSame('Logo de la empresa', $sheet->getDrawingCollection()[0]->getName());
+
+        $spreadsheet->disconnectWorksheets();
+
+        $archive = new ZipArchive;
+        $this->assertTrue($archive->open($response->baseResponse->getFile()->getPathname()) === true);
+        $mediaFiles = [];
+
+        for ($index = 0; $index < $archive->numFiles; $index++) {
+            $name = $archive->getNameIndex($index);
+
+            if (is_string($name) && str_starts_with($name, 'xl/media/')) {
+                $mediaFiles[] = $name;
+            }
+        }
+
+        $archive->close();
+        $this->assertNotEmpty($mediaFiles);
+    }
+
     public function test_pdf_export_generates_a_download(): void
     {
+        $config = ExportConfig::make();
+
+        $this->assertSame(
+            public_path('brand/pixel-perfect-banner.png'),
+            $config->getLogoPath(),
+        );
+        $this->assertNotNull($config->getLogoDataUri());
+
         Puesto::factory()->for($this->empresa)->create(['nombre' => 'Puesto PDF']);
 
         $response = $this->actingAs($this->administrator)

@@ -38,7 +38,7 @@ const activeItemStyles =
 
 export function AppHeader({ breadcrumbs = [] }: Props) {
     const { auth, empresas } = usePage().props;
-    const navigationItems = mainNavItems(empresas.activa?.slug);
+    const navigationItems = mainNavItems(empresas.activa !== null);
     const items = visibleNavItems(
         navigationItems,
         auth.user?.permissions ?? [],

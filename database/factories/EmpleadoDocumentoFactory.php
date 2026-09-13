@@ -25,7 +25,9 @@ class EmpleadoDocumentoFactory extends Factory
             'empresa_id' => fn (array $attributes): mixed => Empleado::query()
                 ->whereKey($attributes['empleado_id'])
                 ->value('empresa_id'),
-            'tipo_documento_empleado_id' => TipoDocumentoEmpleado::factory(),
+            'tipo_documento_empleado_id' => fn (array $attributes): int => TipoDocumentoEmpleado::factory()->create([
+                'empresa_id' => $attributes['empresa_id'],
+            ])->id,
             'nombre_original' => 'documento.pdf',
             'ruta' => fn (array $attributes): string => "empresas/{$attributes['empresa_id']}/empleados/{$attributes['empleado_id']}/documentos/".Str::uuid().'.pdf',
             'disco' => 'local',

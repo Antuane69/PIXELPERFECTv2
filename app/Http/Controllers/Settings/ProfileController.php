@@ -85,10 +85,13 @@ class ProfileController extends Controller
 
         DB::transaction(function () use ($user): void {
             $this->ensureAdministratorRemains->handleAcrossCompanies($user);
-            $user->delete();
+            Auth::logout();
+
+            if (! $user->delete()) {
+                throw new RuntimeException('No se pudo eliminar la cuenta.');
+            }
         });
 
-        Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

@@ -30,7 +30,7 @@ class ManageCompanyRoles
             $before = $creating ? [] : $this->snapshot($role);
             $role->fill([...$data, 'empresa_id' => $empresa->id, 'guard_name' => 'web']);
             $role->save();
-            $role->syncPermissions($permissions);
+            $role->syncPermissions($this->normalizeIdentifiers($permissions));
             $this->recordActivity->handle($empresa, $actor, $role, $creating ? 'role_created' : 'role_updated', $before, $this->snapshot($role));
         });
     }
@@ -58,12 +58,32 @@ class ManageCompanyRoles
         }
     }
 
+    /**
+     * Browser form values arrive as strings; numeric strings must be resolved as IDs by Spatie.
+     *
+     * @param  array<int, int|string>  $identifiers
+     * @return array<int, int|string>
+     */
+    private function normalizeIdentifiers(array $identifiers): array
+    {
+        return array_map(
+            static fn (int|string $identifier): int|string => is_string($identifier) && ctype_digit($identifier)
+                ? (int) $identifier
+                : $identifier,
+            $identifiers,
+        );
+    }
+
     /** @return array{name: string, permissions: list<int>} */
     private function snapshot(Role $role): array
     {
         return [
             'name' => $role->name,
-            'permissions' => $role->permissions()->orderBy('permissions.id')->pluck('permissions.id')->all(),
+            'permissions' => array_values($role->permissions()
+                ->orderBy('permissions.id')
+                ->pluck('permissions.id')
+                ->map(static fn (mixed $permissionId): int => (int) $permissionId)
+                ->all()),
         ];
     }
 }

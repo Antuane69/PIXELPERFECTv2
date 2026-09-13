@@ -21,14 +21,12 @@ export type EmpresaResumen = {
     id: number;
     nombre: string;
     nombre_legal: string;
-    slug: string;
     estado: string;
     modulos?: string[];
     puede_acceder?: boolean;
     grupo?: {
         id: number;
         nombre: string;
-        slug: string;
     } | null;
 };
 

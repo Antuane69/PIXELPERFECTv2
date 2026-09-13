@@ -24,6 +24,7 @@ import { RestoreButton } from '@/components/restore-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePermissions } from '@/hooks/use-permissions';
+import { inicio as empresaInicio } from '@/routes/empresas';
 import { exportar as exportarEmpleados } from '@/routes/empresas/reportes/empleados';
 import type {
     Empleado,
@@ -164,10 +165,7 @@ export default function EmpleadosIndex({
                 >
                     {showingArchived && can('empleados.update') && (
                         <RestoreButton
-                            form={restore.form({
-                                empresa: empresa.slug,
-                                empleado: empleado.id,
-                            })}
+                            form={restore.form(empleado.id)}
                             subject={`a ${empleado.nombre}`}
                         />
                     )}
@@ -210,7 +208,7 @@ export default function EmpleadosIndex({
                         <div className="flex flex-wrap gap-2">
                             <ResourceExportDialog
                                 report="empleados"
-                                exportUrl={exportarEmpleados.url(empresa.slug)}
+                                exportUrl={exportarEmpleados.url()}
                                 filters={{
                                     search: filters?.search,
                                     puesto_id: filters?.puestoId,
@@ -231,7 +229,7 @@ export default function EmpleadosIndex({
                     }
                 />
                 <FiltrosBase
-                    route={index(empresa.slug)}
+                    route={index()}
                     defaultSearch={filters?.search}
                     placeholder="Buscar por nombre, correo, CURP o RFC"
                     facets={filterFacets}
@@ -291,7 +289,7 @@ export default function EmpleadosIndex({
                     title="Nuevo empleado"
                     description="Completa el expediente. Los errores se muestran junto a cada campo."
                     formId="empleado-form"
-                    form={store.form(empresa.slug)}
+                    form={store.form()}
                     resetOnSuccess
                     noValidate
                     submitLabel="Crear empleado"
@@ -315,10 +313,7 @@ export default function EmpleadosIndex({
                     title={`Editar ${editing.nombre}`}
                     description="Actualiza datos del expediente y documentos del empleado."
                     formId="empleado-edit-form"
-                    form={update.form({
-                        empresa: empresa.slug,
-                        empleado: editing.id,
-                    })}
+                    form={update.form(editing.id)}
                     noValidate
                     submitLabel="Actualizar empleado"
                 >
@@ -337,10 +332,7 @@ export default function EmpleadosIndex({
                 <ConfirmDeleteDialog
                     open
                     onOpenChange={(open) => !open && setDeleting(null)}
-                    form={destroy.form({
-                        empresa: empresa.slug,
-                        empleado: deleting.id,
-                    })}
+                    form={destroy.form(deleting.id)}
                     subject={`el empleado “${deleting.nombre}”`}
                     description="El expediente dejará de aparecer en la operación; sus archivos se conservarán para auditoría."
                 />
@@ -348,3 +340,10 @@ export default function EmpleadosIndex({
         </>
     );
 }
+
+EmpleadosIndex.layout = {
+    breadcrumbs: [
+        { title: 'Inicio', href: empresaInicio() },
+        { title: 'Empleados', href: index() },
+    ],
+};

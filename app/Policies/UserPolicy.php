@@ -57,10 +57,38 @@ class UserPolicy
     }
 
     /**
+     * Determine whether the user can manage two-factor authentication for the model.
+     */
+    public function manageTwoFactor(User $user, User $model): bool
+    {
+        return $user->can('users.manage_two_factor')
+            && $this->canManageModel($user, $model);
+    }
+
+    /**
+     * Determine whether the user can send a password reset link for the model.
+     */
+    public function sendPasswordReset(User $user, User $model): bool
+    {
+        return $user->can('users.send_password_reset')
+            && $this->canManageModel($user, $model);
+    }
+
+    /**
      * Determine whether the user can permanently delete the model.
      */
     public function forceDelete(User $user, User $model): bool
     {
         return false;
+    }
+
+    private function canManageModel(User $user, User $model): bool
+    {
+        return $user->can('users.update')
+            && $model->membresiasEmpresa()
+                ->where('empresa_id', getPermissionsTeamId())
+                ->where('estado', 'ACTIVA')
+                ->exists()
+            && (! $model->hasRole('Administrador', 'web') || $user->hasRole('Administrador', 'web'));
     }
 }

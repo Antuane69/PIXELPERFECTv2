@@ -6,12 +6,15 @@ use Database\Factories\TipoDocumentoEmpleadoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 #[Fillable([
+    'empresa_id',
     'nombre',
     'es_renovable',
     'frecuencia_cantidad',
@@ -30,6 +33,14 @@ class TipoDocumentoEmpleado extends Model
     ];
 
     /**
+     * @return BelongsTo<Empresa, $this>
+     */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
+
+    /**
      * @return HasMany<EmpleadoDocumento, $this>
      */
     public function documentos(): HasMany
@@ -42,6 +53,7 @@ class TipoDocumentoEmpleado extends Model
         return LogOptions::defaults()
             ->useLogName('tipos_documento_empleado')
             ->logOnly([
+                'empresa_id',
                 'nombre',
                 'es_renovable',
                 'frecuencia_cantidad',
@@ -51,6 +63,11 @@ class TipoDocumentoEmpleado extends Model
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $activity->setAttribute('empresa_id', $this->empresa_id);
     }
 
     /**

@@ -65,7 +65,7 @@ class TwoFactorChallengeTest extends TestCase
 
         $this->post(route('two-factor.login.store'), [
             'code' => $googleTwoFactor->getCurrentOtp($secret),
-        ])->assertRedirect(route('dashboard', absolute: false));
+        ])->assertRedirect(route('empresa-contexto.create', absolute: false));
 
         $this->assertAuthenticatedAs($user);
     }
@@ -82,7 +82,7 @@ class TwoFactorChallengeTest extends TestCase
 
         $this->post(route('two-factor.login.store'), [
             'recovery_code' => $recoveryCode,
-        ])->assertRedirect(route('dashboard', absolute: false));
+        ])->assertRedirect(route('empresa-contexto.create', absolute: false));
 
         $this->assertAuthenticatedAs($user);
         $this->assertNotContains($recoveryCode, $user->refresh()->recoveryCodes());

@@ -32,6 +32,13 @@ export function normalizeRfc(value: string): string {
         .slice(0, 13);
 }
 
+export function normalizeUsername(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '')
+        .slice(0, 60);
+}
+
 export function normalizeMoney(value: string): string {
     const normalized = value.replace(',', '.').replace(/[^0-9.]/g, '');
     const [whole, ...decimalParts] = normalized.split('.');
@@ -46,6 +53,18 @@ export function normalizeMoney(value: string): string {
     }
 
     return `${whole}.${decimals}`;
+}
+
+export function formatMoney(value: string): string {
+    const normalized = normalizeMoney(value);
+
+    if (normalized === '') {
+        return '';
+    }
+
+    const [whole, decimals = ''] = normalized.split('.');
+
+    return `${whole || '0'}.${decimals.padEnd(2, '0')}`;
 }
 
 export function documentExtensions(formats: string[]): string[] {

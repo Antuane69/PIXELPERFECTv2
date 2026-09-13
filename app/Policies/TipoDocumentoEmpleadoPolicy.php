@@ -12,7 +12,7 @@ class TipoDocumentoEmpleadoPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->es_superadministrador_plataforma;
+        return $user->can('tipos_documento.view');
     }
 
     /**
@@ -20,7 +20,7 @@ class TipoDocumentoEmpleadoPolicy
      */
     public function view(User $user, TipoDocumentoEmpleado $tipoDocumentoEmpleado): bool
     {
-        return $user->es_superadministrador_plataforma;
+        return $user->can('tipos_documento.view') && $this->belongsToActiveCompany($tipoDocumentoEmpleado);
     }
 
     /**
@@ -28,7 +28,7 @@ class TipoDocumentoEmpleadoPolicy
      */
     public function create(User $user): bool
     {
-        return $user->es_superadministrador_plataforma;
+        return $user->can('tipos_documento.create');
     }
 
     /**
@@ -36,7 +36,7 @@ class TipoDocumentoEmpleadoPolicy
      */
     public function update(User $user, TipoDocumentoEmpleado $tipoDocumentoEmpleado): bool
     {
-        return $user->es_superadministrador_plataforma;
+        return $user->can('tipos_documento.update') && $this->belongsToActiveCompany($tipoDocumentoEmpleado);
     }
 
     /**
@@ -44,7 +44,7 @@ class TipoDocumentoEmpleadoPolicy
      */
     public function delete(User $user, TipoDocumentoEmpleado $tipoDocumentoEmpleado): bool
     {
-        return $user->es_superadministrador_plataforma;
+        return $user->can('tipos_documento.delete') && $this->belongsToActiveCompany($tipoDocumentoEmpleado);
     }
 
     /**
@@ -52,7 +52,7 @@ class TipoDocumentoEmpleadoPolicy
      */
     public function restore(User $user, TipoDocumentoEmpleado $tipoDocumentoEmpleado): bool
     {
-        return $user->es_superadministrador_plataforma;
+        return $user->can('tipos_documento.update') && $this->belongsToActiveCompany($tipoDocumentoEmpleado);
     }
 
     /**
@@ -61,5 +61,10 @@ class TipoDocumentoEmpleadoPolicy
     public function forceDelete(User $user, TipoDocumentoEmpleado $tipoDocumentoEmpleado): bool
     {
         return false;
+    }
+
+    private function belongsToActiveCompany(TipoDocumentoEmpleado $tipoDocumentoEmpleado): bool
+    {
+        return (int) getPermissionsTeamId() === $tipoDocumentoEmpleado->empresa_id;
     }
 }

@@ -9,9 +9,9 @@ use App\Http\Requests\Empleados\StoreEmpleadoRequest;
 use App\Http\Requests\Empleados\UpdateEmpleadoRequest;
 use App\Models\Empleado;
 use App\Models\EmpleadoDocumento;
-use App\Models\Empresa;
 use App\Models\Puesto;
 use App\Models\TipoDocumentoEmpleado;
+use App\Services\Empresas\EmpresaContext;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -35,13 +35,15 @@ class EmpleadoController extends Controller
         private readonly SaveEmpleado $saveEmpleado,
         private readonly DeleteEmpleado $deleteEmpleado,
         private readonly RestoreEmpleado $restoreEmpleado,
+        private readonly EmpresaContext $empresaContext,
     ) {}
 
     /**
      * Display a paginated employee listing.
      */
-    public function index(Request $request, Empresa $empresa): Response
+    public function index(Request $request): Response
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('viewAny', Empleado::class);
 
         $search = $request->string('search')->squish()->toString();
@@ -151,6 +153,7 @@ class EmpleadoController extends Controller
                     'frecuencia_tipo',
                     'activo',
                 ])
+                ->where('empresa_id', $empresa->id)
                 ->orderBy('nombre')
                 ->get(),
             'filters' => [
@@ -166,7 +169,7 @@ class EmpleadoController extends Controller
     /**
      * Store a newly created employee and its files.
      */
-    public function store(StoreEmpleadoRequest $request, Empresa $empresa): RedirectResponse
+    public function store(StoreEmpleadoRequest $request): RedirectResponse
     {
         Gate::authorize('create', Empleado::class);
 
@@ -178,14 +181,13 @@ class EmpleadoController extends Controller
             $request,
             'empresas.empleados.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa],
         );
     }
 
     /**
      * Restore the specified archived employee and its private records.
      */
-    public function restore(Request $request, Empresa $empresa, Empleado $empleado): RedirectResponse
+    public function restore(Request $request, Empleado $empleado): RedirectResponse
     {
         Gate::authorize('restore', $empleado);
 
@@ -197,14 +199,14 @@ class EmpleadoController extends Controller
             $request,
             'empresas.empleados.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa, 'archivados' => true],
+            ['archivados' => true],
         );
     }
 
     /**
      * Update the specified employee and its files.
      */
-    public function update(UpdateEmpleadoRequest $request, Empresa $empresa, Empleado $empleado): RedirectResponse
+    public function update(UpdateEmpleadoRequest $request, Empleado $empleado): RedirectResponse
     {
         Gate::authorize('update', $empleado);
 
@@ -219,14 +221,13 @@ class EmpleadoController extends Controller
             $request,
             'empresas.empleados.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa],
         );
     }
 
     /**
      * Soft delete the specified employee while preserving its private records.
      */
-    public function destroy(Request $request, Empresa $empresa, Empleado $empleado): RedirectResponse
+    public function destroy(Request $request, Empleado $empleado): RedirectResponse
     {
         Gate::authorize('delete', $empleado);
 
@@ -238,7 +239,6 @@ class EmpleadoController extends Controller
             $request,
             'empresas.empleados.index',
             self::INDEX_QUERY_PARAMETERS,
-            ['empresa' => $empresa],
         );
     }
 
@@ -264,7 +264,6 @@ class EmpleadoController extends Controller
             'avatar_url' => $empleado->trashed() || $empleado->avatar === null
                 ? null
                 : route('empresas.empleados.avatar', [
-                    'empresa' => $empleado->empresa,
                     'empleado' => $empleado,
                 ], absolute: false),
             'salario_dia' => $this->decimal($empleado->salario_dia),
@@ -303,14 +302,12 @@ class EmpleadoController extends Controller
                     'preview_url' => $empleado->trashed() || ! str_starts_with($documento->mime_type, 'image/')
                         ? null
                         : route('empresas.empleados.documentos.preview', [
-                            'empresa' => $empleado->empresa,
                             'empleado' => $empleado,
                             'documento' => $documento,
                         ], absolute: false),
                     'download_url' => $empleado->trashed()
                         ? null
                         : route('empresas.empleados.documentos.download', [
-                            'empresa' => $empleado->empresa,
                             'empleado' => $empleado,
                             'documento' => $documento,
                         ], absolute: false),

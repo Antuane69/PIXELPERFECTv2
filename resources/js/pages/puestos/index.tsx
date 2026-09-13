@@ -11,6 +11,11 @@ import {
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { FiltrosBase } from '@/components/filtros-base';
 import type { FilterFacet } from '@/components/filtros-base';
+import {
+    formatMoney,
+    normalizeInput,
+    normalizeMoney,
+} from '@/components/forms/form-utils';
 import InputError from '@/components/input-error';
 import { ResourceExportDialog } from '@/components/resource-export-dialog';
 import { ResourceFormDialog } from '@/components/resource-form-dialog';
@@ -25,6 +30,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/hooks/use-permissions';
+import { inicio as empresaInicio } from '@/routes/empresas';
 import { exportar as exportarPuestos } from '@/routes/empresas/reportes/puestos';
 import type { LaravelPaginator, Puesto } from '@/types';
 
@@ -123,10 +129,7 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                 <div className="flex justify-end gap-2 md:justify-start">
                     {showingArchived && can('puestos.update') && (
                         <RestoreButton
-                            form={restore.form({
-                                empresa: empresa.slug,
-                                puesto: puesto.id,
-                            })}
+                            form={restore.form(puesto.id)}
                             subject={`el puesto ${puesto.nombre}`}
                         />
                     )}
@@ -170,7 +173,7 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                         <div className="flex flex-wrap gap-2">
                             <ResourceExportDialog
                                 report="puestos"
-                                exportUrl={exportarPuestos.url(empresa.slug)}
+                                exportUrl={exportarPuestos.url()}
                                 filters={{
                                     search: filters?.search,
                                     activo: filters?.activo,
@@ -191,7 +194,7 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                     }
                 />
                 <FiltrosBase
-                    route={index(empresa.slug)}
+                    route={index()}
                     defaultSearch={filters?.search}
                     placeholder="Buscar puesto"
                     facets={filterFacets}
@@ -219,17 +222,13 @@ export default function PuestosIndex({ puestos, filters }: Props) {
                     open={dialogOpen}
                     onOpenChange={setDialogOpen}
                     puesto={editing}
-                    empresaSlug={empresa.slug}
                 />
             )}
             {deleting && (
                 <ConfirmDeleteDialog
                     open
                     onOpenChange={(open) => !open && setDeleting(null)}
-                    form={destroy.form({
-                        empresa: empresa.slug,
-                        puesto: deleting.id,
-                    })}
+                    form={destroy.form(deleting.id)}
                     subject={`el puesto “${deleting.nombre}”`}
                 />
             )}
@@ -237,16 +236,21 @@ export default function PuestosIndex({ puestos, filters }: Props) {
     );
 }
 
+PuestosIndex.layout = {
+    breadcrumbs: [
+        { title: 'Inicio', href: empresaInicio() },
+        { title: 'Puestos', href: index() },
+    ],
+};
+
 function PuestoDialog({
     open,
     onOpenChange,
     puesto,
-    empresaSlug,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     puesto: Puesto | null;
-    empresaSlug: string;
 }) {
     const formId = 'puesto-form';
 
@@ -257,14 +261,7 @@ function PuestoDialog({
             title={puesto ? 'Editar puesto' : 'Nuevo puesto'}
             description="Define el nombre, importes y disponibilidad del puesto."
             formId={formId}
-            form={
-                puesto
-                    ? update.form({
-                          empresa: empresaSlug,
-                          puesto: puesto.id,
-                      })
-                    : store.form(empresaSlug)
-            }
+            form={puesto ? update.form(puesto.id) : store.form()}
             resetOnSuccess={!puesto}
         >
             {(errors) => (
@@ -287,12 +284,22 @@ function PuestoDialog({
                             </Label>
                             <Input
                                 id="puesto-salario-dia"
-                                type="number"
+                                type="text"
+                                inputMode="decimal"
                                 name="salario_dia"
                                 min="0"
-                                step="0.01"
-                                defaultValue={puesto?.salario_dia ?? ''}
+                                pattern="[0-9]+([.][0-9]{0,2})?"
+                                title="Ingresa máximo 2 decimales."
+                                defaultValue={formatMoney(
+                                    String(puesto?.salario_dia ?? ''),
+                                )}
                                 required
+                                onInput={(event) =>
+                                    normalizeInput(event, normalizeMoney)
+                                }
+                                onBlur={(event) =>
+                                    normalizeInput(event, formatMoney)
+                                }
                             />
                             <InputError message={errors.salario_dia} />
                         </div>
@@ -302,12 +309,22 @@ function PuestoDialog({
                             </Label>
                             <Input
                                 id="puesto-salario-quincena"
-                                type="number"
+                                type="text"
+                                inputMode="decimal"
                                 name="salario_quincena"
                                 min="0"
-                                step="0.01"
-                                defaultValue={puesto?.salario_quincena ?? ''}
+                                pattern="[0-9]+([.][0-9]{0,2})?"
+                                title="Ingresa máximo 2 decimales."
+                                defaultValue={formatMoney(
+                                    String(puesto?.salario_quincena ?? ''),
+                                )}
                                 required
+                                onInput={(event) =>
+                                    normalizeInput(event, normalizeMoney)
+                                }
+                                onBlur={(event) =>
+                                    normalizeInput(event, formatMoney)
+                                }
                             />
                             <InputError message={errors.salario_quincena} />
                         </div>

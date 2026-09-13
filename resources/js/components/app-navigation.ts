@@ -1,9 +1,11 @@
 import {
     BriefcaseBusiness,
+    Boxes,
     Building2,
     FileCheck2,
     FileText,
     BadgeDollarSign,
+    KeyRound,
     LayoutDashboard,
     ShieldCheck,
     UserRoundCog,
@@ -18,14 +20,62 @@ import { dashboard } from '@/routes';
 import { inicio as empresaInicio } from '@/routes/empresas';
 import { index as logsIndex } from '@/routes/logs';
 import { index as empresasPlatformIndex } from '@/routes/platform/empresas';
+import { index as modulosPlatformIndex } from '@/routes/platform/modulos';
+import { index as permisosPlatformIndex } from '@/routes/platform/permisos';
 import { index as planesPlatformIndex } from '@/routes/platform/planes';
+import { index as usuariosPlatformIndex } from '@/routes/platform/usuarios';
 import type { NavItem } from '@/types';
 
-export function mainNavItems(empresaSlug?: string | null): NavItem[] {
-    const items: NavItem[] = [
+export function mainNavItems(hasEmpresaContext = false): NavItem[] {
+    if (hasEmpresaContext) {
+        return [
+            {
+                title: 'Dashboard',
+                href: empresaInicio(),
+                icon: LayoutDashboard,
+            },
+            {
+                title: 'Usuarios',
+                href: usersIndex(),
+                icon: UserRoundCog,
+                permission: 'users.view',
+                module: 'usuarios',
+            },
+            {
+                title: 'Roles',
+                href: rolesIndex(),
+                icon: ShieldCheck,
+                permission: 'roles.view',
+                module: 'roles',
+            },
+            {
+                title: 'Puestos',
+                href: puestosIndex(),
+                icon: BriefcaseBusiness,
+                permission: 'puestos.view',
+                module: 'puestos',
+            },
+            {
+                title: 'Documentos',
+                href: tiposDocumentoIndex(),
+                icon: FileCheck2,
+                permission: 'tipos_documento.view',
+                module: 'empleados',
+            },
+            {
+                title: 'Empleados',
+                href: empleadosIndex(),
+                icon: UsersRound,
+                permission: 'empleados.view',
+                module: 'empleados',
+            },
+        ];
+    }
+
+    return [
         {
             title: 'Dashboard',
-            href: empresaSlug ? empresaInicio(empresaSlug) : dashboard(),
+            href: dashboard(),
             icon: LayoutDashboard,
         },
         {
@@ -41,53 +91,30 @@ export function mainNavItems(empresaSlug?: string | null): NavItem[] {
             platformOnly: true,
         },
         {
+            title: 'Usuarios',
+            href: usuariosPlatformIndex(),
+            icon: UserRoundCog,
+            platformOnly: true,
+        },
+        {
             title: 'Planes',
             href: planesPlatformIndex(),
             icon: BadgeDollarSign,
             platformOnly: true,
         },
         {
-            title: 'Tipos de documento',
-            href: tiposDocumentoIndex(),
-            icon: FileCheck2,
+            title: 'Módulos',
+            href: modulosPlatformIndex(),
+            icon: Boxes,
+            platformOnly: true,
+        },
+        {
+            title: 'Permisos',
+            href: permisosPlatformIndex(),
+            icon: KeyRound,
             platformOnly: true,
         },
     ];
-
-    if (empresaSlug) {
-        items.push(
-            {
-                title: 'Usuarios',
-                href: usersIndex(empresaSlug),
-                icon: UserRoundCog,
-                permission: 'users.view',
-                module: 'usuarios',
-            },
-            {
-                title: 'Roles',
-                href: rolesIndex(empresaSlug),
-                icon: ShieldCheck,
-                permission: 'roles.view',
-                module: 'roles',
-            },
-            {
-                title: 'Puestos',
-                href: puestosIndex(empresaSlug),
-                icon: BriefcaseBusiness,
-                permission: 'puestos.view',
-                module: 'puestos',
-            },
-            {
-                title: 'Empleados',
-                href: empleadosIndex(empresaSlug),
-                icon: UsersRound,
-                permission: 'empleados.view',
-                module: 'empleados',
-            },
-        );
-    }
-
-    return items;
 }
 
 export function visibleNavItems(

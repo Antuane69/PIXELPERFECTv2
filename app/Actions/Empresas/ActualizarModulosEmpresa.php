@@ -2,8 +2,11 @@
 
 namespace App\Actions\Empresas;
 
+use App\AlcancePermiso;
 use App\Models\Empresa;
 use App\Models\Modulo;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Models\Activity;
@@ -31,6 +34,20 @@ class ActualizarModulosEmpresa
             ]);
 
             $empresa->modulos()->sync($sync->all(), false);
+
+            $administratorRole = Role::query()
+                ->where('empresa_id', $empresa->id)
+                ->where('name', 'Administrador')
+                ->where('guard_name', 'web')
+                ->first();
+
+            $administratorRole?->syncPermissions(
+                Permission::query()
+                    ->where('guard_name', 'web')
+                    ->where('alcance', AlcancePermiso::Empresa)
+                    ->whereIn('modulo_id', $enabledModuleIds)
+                    ->get(),
+            );
 
             $after = Modulo::query()
                 ->where('activo', true)

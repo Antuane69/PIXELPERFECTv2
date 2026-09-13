@@ -3,21 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\Empleado;
-use App\Models\Empresa;
 use App\Services\Empleados\EmpleadoPrivatePath;
+use App\Services\Empresas\EmpresaContext;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ShowEmpleadoAvatarController extends Controller
 {
-    public function __construct(private EmpleadoPrivatePath $privatePath) {}
+    public function __construct(
+        private EmpleadoPrivatePath $privatePath,
+        private EmpresaContext $empresaContext,
+    ) {}
 
     /**
      * Stream a private employee avatar after authorization.
      */
-    public function __invoke(Empresa $empresa, Empleado $empleado): StreamedResponse
+    public function __invoke(Empleado $empleado): StreamedResponse
     {
+        $empresa = $this->empresaContext->empresaRequerida();
         abort_unless($empleado->empresa_id === $empresa->id, 404);
         Gate::authorize('view', $empleado);
 

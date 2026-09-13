@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Middleware\EnsureModuleEnabled;
+use App\Http\Middleware\EnsurePlatformAdministrator;
 use App\Http\Middleware\EstablecerEmpresaActiva;
-use App\Http\Middleware\EstablecerEmpresaInicial;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InicializarContextoPermisos;
@@ -36,8 +36,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'empresa.activa' => EstablecerEmpresaActiva::class,
-            'empresa.inicial' => EstablecerEmpresaInicial::class,
             'modulo.habilitado' => EnsureModuleEnabled::class,
+            'platform.admin' => EnsurePlatformAdministrator::class,
         ]);
 
         $middleware->prependToPriorityList(
@@ -45,11 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EstablecerEmpresaActiva::class,
         );
         $middleware->prependToPriorityList(
-            SubstituteBindings::class,
-            EstablecerEmpresaInicial::class,
-        );
-        $middleware->prependToPriorityList(
-            [EstablecerEmpresaActiva::class, EstablecerEmpresaInicial::class],
+            EstablecerEmpresaActiva::class,
             InicializarContextoPermisos::class,
         );
 

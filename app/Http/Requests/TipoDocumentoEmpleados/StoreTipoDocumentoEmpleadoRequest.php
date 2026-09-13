@@ -3,6 +3,7 @@
 namespace App\Http\Requests\TipoDocumentoEmpleados;
 
 use App\Models\TipoDocumentoEmpleado;
+use App\Services\Empresas\EmpresaContext;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -36,13 +37,16 @@ class StoreTipoDocumentoEmpleadoRequest extends FormRequest
      */
     public function rules(): array
     {
+        $empresa = app(EmpresaContext::class)->empresaRequerida();
+
         return [
             'nombre' => [
                 'required',
                 'string',
                 'min:2',
                 'max:120',
-                Rule::unique(TipoDocumentoEmpleado::class, 'nombre'),
+                Rule::unique(TipoDocumentoEmpleado::class, 'nombre')
+                    ->where('empresa_id', $empresa->id),
             ],
             'es_renovable' => ['sometimes', 'boolean'],
             'frecuencia_cantidad' => [

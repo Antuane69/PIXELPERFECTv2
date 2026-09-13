@@ -8,10 +8,11 @@ use App\Models\MembresiaEmpresa;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\URL;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -29,10 +30,10 @@ class UserManagementTest extends TestCase
 
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->empresa = Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail();
-        URL::defaults(['empresa' => $this->empresa->slug]);
         $this->administrator = User::factory()->create();
         $this->addToEmpresa($this->administrator);
         $this->administrator->assignRole('Administrador');
+        $this->withEmpresaContext($this->empresa);
     }
 
     public function test_platform_administrator_can_create_and_update_a_user_with_roles(): void
@@ -43,7 +44,6 @@ class UserManagementTest extends TestCase
         $role = Role::findOrCreate('Recursos Humanos', 'web');
         $password = 'Secure-password1!';
         $filteredIndex = route('empresas.users.index', [
-            'empresa' => $this->empresa,
             'search' => 'Gestionado',
             'per_page' => 25,
             'page' => 2,
@@ -56,7 +56,7 @@ class UserManagementTest extends TestCase
                 'email' => ' Gestionado@Example.COM ',
                 'password' => $password,
                 'password_confirmation' => $password,
-                'roles' => [$role->id],
+                'roles' => [(string) $role->id],
             ])
             ->assertSessionHasNoErrors()
             ->assertRedirect($filteredIndex);
@@ -110,7 +110,7 @@ class UserManagementTest extends TestCase
                 'roles' => [$role->id],
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('empresas.users.index', ['empresa' => $this->empresa]));
+            ->assertRedirect(route('empresas.users.index'));
 
         $this->assertSame('nuevo-correo@example.com', $user->refresh()->email);
         $this->assertNull($user->email_verified_at);
@@ -118,6 +118,77 @@ class UserManagementTest extends TestCase
             SendEmailVerificationEmail::class,
             fn (SendEmailVerificationEmail $job): bool => $job->email === $user->email,
         );
+    }
+
+    public function test_administrator_can_activate_and_deactivate_two_factor_for_a_user(): void
+    {
+        $user = User::factory()->create();
+        $this->addToEmpresa($user);
+
+        $this->actingAs($this->administrator)
+            ->patch(route('empresas.users.two-factor', ['user' => $user]), [
+                'enabled' => true,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('empresas.users.index'));
+
+        $user->refresh();
+        $this->assertTrue($user->hasEnabledTwoFactorAuthentication());
+        $this->assertNotNull($user->two_factor_secret);
+        $this->assertNotNull($user->two_factor_confirmed_at);
+
+        $this->actingAs($this->administrator)
+            ->patch(route('empresas.users.two-factor', ['user' => $user]), [
+                'enabled' => false,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('empresas.users.index'));
+
+        $this->assertFalse($user->refresh()->hasEnabledTwoFactorAuthentication());
+        $this->assertNull($user->two_factor_secret);
+        $this->assertNull($user->two_factor_recovery_codes);
+    }
+
+    public function test_two_factor_management_requires_specific_permission(): void
+    {
+        $manager = User::factory()->create();
+        $this->addToEmpresa($manager);
+        $manager->givePermissionTo('users.update');
+        $user = User::factory()->create();
+        $this->addToEmpresa($user);
+
+        $this->actingAs($manager)
+            ->patch(route('empresas.users.two-factor', ['user' => $user]), [
+                'enabled' => true,
+            ])
+            ->assertForbidden();
+
+        $this->assertFalse($user->refresh()->hasEnabledTwoFactorAuthentication());
+    }
+
+    public function test_password_reset_email_requires_specific_permission(): void
+    {
+        Notification::fake();
+        $manager = User::factory()->create();
+        $this->addToEmpresa($manager);
+        $manager->givePermissionTo(['users.update', 'users.send_password_reset']);
+        $user = User::factory()->create();
+        $this->addToEmpresa($user);
+
+        $this->actingAs($manager)
+            ->post(route('empresas.users.password-reset', ['user' => $user]))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('empresas.users.index'));
+
+        Notification::assertSentTo($user, ResetPassword::class);
+
+        $withoutPermission = User::factory()->create();
+        $this->addToEmpresa($withoutPermission);
+        $withoutPermission->givePermissionTo('users.update');
+
+        $this->actingAs($withoutPermission)
+            ->post(route('empresas.users.password-reset', ['user' => $user]))
+            ->assertForbidden();
     }
 
     public function test_user_validation_rejects_duplicate_email_and_invalid_role(): void
@@ -185,10 +256,10 @@ class UserManagementTest extends TestCase
     public function test_administrator_cannot_delete_their_own_account_but_can_delete_another_user(): void
     {
         $this->actingAs($this->administrator)
-            ->from(route('empresas.users.index', ['empresa' => $this->empresa]))
+            ->from(route('empresas.users.index'))
             ->delete(route('empresas.users.destroy', ['user' => $this->administrator]))
             ->assertSessionHasErrors('user')
-            ->assertRedirect(route('empresas.users.index', ['empresa' => $this->empresa]));
+            ->assertRedirect(route('empresas.users.index'));
 
         $this->assertModelExists($this->administrator);
 
@@ -198,7 +269,7 @@ class UserManagementTest extends TestCase
         $this->actingAs($this->administrator)
             ->delete(route('empresas.users.destroy', ['user' => $otherUser]))
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('empresas.users.index', ['empresa' => $this->empresa]));
+            ->assertRedirect(route('empresas.users.index'));
 
         $this->assertModelExists($otherUser);
         $this->assertDatabaseMissing('membresias_empresa', [
@@ -212,7 +283,7 @@ class UserManagementTest extends TestCase
         $otherRole = Role::findOrCreate('Operador', 'web');
 
         $this->actingAs($this->administrator)
-            ->from(route('empresas.users.index', ['empresa' => $this->empresa]))
+            ->from(route('empresas.users.index'))
             ->put(route('empresas.users.update', ['user' => $this->administrator]), [
                 'name' => $this->administrator->name,
                 'email' => $this->administrator->email,
@@ -221,7 +292,7 @@ class UserManagementTest extends TestCase
                 'roles' => [$otherRole->id],
             ])
             ->assertSessionHasErrors('roles')
-            ->assertRedirect(route('empresas.users.index', ['empresa' => $this->empresa]));
+            ->assertRedirect(route('empresas.users.index'));
 
         $this->assertTrue($this->administrator->fresh()?->hasRole('Administrador'));
     }
@@ -244,7 +315,7 @@ class UserManagementTest extends TestCase
                 'password_confirmation' => null,
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('empresas.users.index', ['empresa' => $this->empresa]));
+            ->assertRedirect(route('empresas.users.index'));
 
         $user->refresh();
 
@@ -267,7 +338,7 @@ class UserManagementTest extends TestCase
                 'password_confirmation' => null,
             ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('empresas.users.index', ['empresa' => $this->empresa]));
+            ->assertRedirect(route('empresas.users.index'));
 
         $user->refresh();
 
@@ -286,7 +357,7 @@ class UserManagementTest extends TestCase
         $user->assignRole($assignedRole);
 
         $this->actingAs($manager)
-            ->from(route('empresas.users.index', ['empresa' => $this->empresa]))
+            ->from(route('empresas.users.index'))
             ->put(route('empresas.users.update', ['user' => $user]), [
                 'name' => $user->name,
                 'email' => $user->email,
@@ -295,7 +366,7 @@ class UserManagementTest extends TestCase
                 'roles' => [$requestedRole->id],
             ])
             ->assertSessionHasErrors('roles')
-            ->assertRedirect(route('empresas.users.index', ['empresa' => $this->empresa]));
+            ->assertRedirect(route('empresas.users.index'));
 
         $user->refresh();
 

@@ -41,8 +41,9 @@ class EmpresaModuleEntitlementTest extends TestCase
                 'nombre_legal' => 'Empresa modular SA de CV',
                 'nombre_comercial' => 'Empresa modular',
                 'grupo_empresarial_id' => null,
-                'rfc' => null,
+                'rfc' => 'MOD010203XY9',
                 'correo_contacto' => 'modular@example.com',
+                'codigo_pais_contacto' => '52',
                 'telefono_contacto' => '5555555555',
                 'zona_horaria' => 'America/Mexico_City',
                 'moneda' => 'MXN',
@@ -91,7 +92,8 @@ class EmpresaModuleEntitlementTest extends TestCase
                 )),
             );
 
-        $this->actingAs($firstAdministrator)
+        $this->withEmpresaContext($first)
+            ->actingAs($firstAdministrator)
             ->get(route('empresas.puestos.index', $first))
             ->assertForbidden();
 
@@ -108,7 +110,16 @@ class EmpresaModuleEntitlementTest extends TestCase
                 ->where('stats.puestosActivos', null),
             );
 
-        $this->actingAs($secondAdministrator)
+        $this->actingAs($firstAdministrator)
+            ->get(route('empresas.roles.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('permissions', fn (mixed $permissions): bool => collect($permissions)
+                    ->every(fn (mixed $permission): bool => is_array($permission)
+                        && ! str_starts_with((string) $permission['name'], 'puestos.'))));
+
+        $this->withEmpresaContext($second)
+            ->actingAs($secondAdministrator)
             ->get(route('empresas.puestos.index', $second))
             ->assertOk();
 
@@ -133,7 +144,8 @@ class EmpresaModuleEntitlementTest extends TestCase
 
         $this->assertTrue($empresa->moduloHabilitado('empleados'));
 
-        $this->actingAs($user)
+        $this->withEmpresaContext($empresa)
+            ->actingAs($user)
             ->get(route('empresas.empleados.index', $empresa))
             ->assertForbidden();
     }

@@ -3,6 +3,8 @@
 namespace Tests\Feature\Management;
 
 use App\Models\EmpleadoDocumento;
+use App\Models\Empresa;
+use App\Models\MembresiaEmpresa;
 use App\Models\TipoDocumentoEmpleado;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -16,17 +18,22 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
 
     private User $administrator;
 
+    private Empresa $empresa;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(RolesAndPermissionsSeeder::class);
+        $this->empresa = Empresa::query()->where('slug', 'pixel-perfect')->firstOrFail();
         $this->administrator = User::factory()->superadministradorPlataforma()->create();
+        MembresiaEmpresa::factory()->for($this->empresa)->for($this->administrator)->create();
+        $this->withEmpresaContext($this->empresa);
     }
 
     public function test_administrator_can_create_update_and_soft_delete_a_document_type(): void
     {
-        $filteredIndex = route('platform.tipos-documento-empleados.index', [
+        $filteredIndex = route('empresas.tipos-documento-empleados.index', [
             'search' => 'Identificación',
             'activo' => true,
             'es_renovable' => true,
@@ -36,7 +43,7 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($filteredIndex)
-            ->post(route('platform.tipos-documento-empleados.store'), [
+            ->post(route('empresas.tipos-documento-empleados.store'), [
                 'nombre' => 'Identificación oficial',
                 'es_renovable' => true,
                 'frecuencia_cantidad' => 4,
@@ -55,7 +62,7 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($filteredIndex)
-            ->put(route('platform.tipos-documento-empleados.update', $tipoDocumento), [
+            ->put(route('empresas.tipos-documento-empleados.update', $tipoDocumento), [
                 'nombre' => 'Identificación vigente',
                 'es_renovable' => false,
                 'documentos_aceptados' => ['PDF'],
@@ -73,7 +80,7 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($filteredIndex)
-            ->delete(route('platform.tipos-documento-empleados.destroy', $tipoDocumento))
+            ->delete(route('empresas.tipos-documento-empleados.destroy', $tipoDocumento))
             ->assertSessionHasNoErrors()
             ->assertRedirect($filteredIndex);
 
@@ -83,7 +90,7 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
     public function test_document_type_validation_requires_frequency_and_valid_extensions(): void
     {
         $this->actingAs($this->administrator)
-            ->post(route('platform.tipos-documento-empleados.store'), [
+            ->post(route('empresas.tipos-documento-empleados.store'), [
                 'nombre' => 'Documento renovable',
                 'es_renovable' => true,
                 'documentos_aceptados' => ['exe'],
@@ -98,16 +105,16 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
 
     public function test_document_type_listing_filters_and_caps_page_size(): void
     {
-        TipoDocumentoEmpleado::factory()->create([
+        TipoDocumentoEmpleado::factory()->for($this->empresa)->create([
             'nombre' => 'Needle Renewable',
             'es_renovable' => true,
             'activo' => true,
         ]);
-        TipoDocumentoEmpleado::factory()->inactive()->create(['nombre' => 'Needle Inactive']);
-        TipoDocumentoEmpleado::factory()->create(['nombre' => 'Other Type']);
+        TipoDocumentoEmpleado::factory()->for($this->empresa)->inactive()->create(['nombre' => 'Needle Inactive']);
+        TipoDocumentoEmpleado::factory()->for($this->empresa)->create(['nombre' => 'Other Type']);
 
         $this->actingAs($this->administrator)
-            ->get(route('platform.tipos-documento-empleados.index', [
+            ->get(route('empresas.tipos-documento-empleados.index', [
                 'search' => 'Needle',
                 'activo' => true,
                 'es_renovable' => true,
@@ -125,14 +132,14 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
     public function test_document_type_pagination_preserves_active_filters_on_the_second_page(): void
     {
         foreach (range(1, 7) as $index) {
-            TipoDocumentoEmpleado::factory()->renewable()->create([
+            TipoDocumentoEmpleado::factory()->for($this->empresa)->renewable()->create([
                 'nombre' => sprintf('TIPO PAGINADO %02d', $index),
                 'activo' => true,
             ]);
         }
 
         $this->actingAs($this->administrator)
-            ->get(route('platform.tipos-documento-empleados.index', [
+            ->get(route('empresas.tipos-documento-empleados.index', [
                 'search' => 'TIPO PAGINADO',
                 'activo' => true,
                 'es_renovable' => true,
@@ -157,33 +164,33 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
 
     public function test_document_type_in_use_cannot_be_deleted(): void
     {
-        $tipoDocumento = TipoDocumentoEmpleado::factory()->create();
+        $tipoDocumento = TipoDocumentoEmpleado::factory()->for($this->empresa)->create();
         EmpleadoDocumento::factory()->create([
             'tipo_documento_empleado_id' => $tipoDocumento->id,
         ]);
 
         $this->actingAs($this->administrator)
-            ->from(route('platform.tipos-documento-empleados.index'))
-            ->delete(route('platform.tipos-documento-empleados.destroy', $tipoDocumento))
+            ->from(route('empresas.tipos-documento-empleados.index'))
+            ->delete(route('empresas.tipos-documento-empleados.destroy', $tipoDocumento))
             ->assertSessionHasErrors('tipoDocumentoEmpleado')
-            ->assertRedirect(route('platform.tipos-documento-empleados.index'));
+            ->assertRedirect(route('empresas.tipos-documento-empleados.index'));
 
         $this->assertNotSoftDeleted($tipoDocumento);
     }
 
     public function test_administrator_can_list_and_restore_archived_document_types(): void
     {
-        TipoDocumentoEmpleado::factory()->create(['nombre' => 'Tipo vigente']);
-        $archivedType = TipoDocumentoEmpleado::factory()->create(['nombre' => 'Tipo archivado']);
+        TipoDocumentoEmpleado::factory()->for($this->empresa)->create(['nombre' => 'Tipo vigente']);
+        $archivedType = TipoDocumentoEmpleado::factory()->for($this->empresa)->create(['nombre' => 'Tipo archivado']);
         $archivedType->delete();
-        $archivedIndex = route('platform.tipos-documento-empleados.index', [
+        $archivedIndex = route('empresas.tipos-documento-empleados.index', [
             'archivados' => true,
             'search' => 'Tipo',
             'page' => 2,
         ]);
 
         $this->actingAs($this->administrator)
-            ->get(route('platform.tipos-documento-empleados.index', ['archivados' => true]))
+            ->get(route('empresas.tipos-documento-empleados.index', ['archivados' => true]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('tipos-documento-empleados/index')
@@ -194,7 +201,7 @@ class TipoDocumentoEmpleadoManagementTest extends TestCase
 
         $this->actingAs($this->administrator)
             ->from($archivedIndex)
-            ->patch(route('platform.tipos-documento-empleados.restore', $archivedType))
+            ->patch(route('empresas.tipos-documento-empleados.restore', $archivedType))
             ->assertSessionHasNoErrors()
             ->assertRedirect($archivedIndex);
 

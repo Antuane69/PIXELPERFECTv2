@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Empresa;
 use App\Models\TipoDocumentoEmpleado;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -21,6 +22,7 @@ class TipoDocumentoEmpleadoFactory extends Factory
         $esRenovable = fake()->boolean(60);
 
         return [
+            'empresa_id' => Empresa::factory(),
             'nombre' => Str::upper(rtrim(fake()->unique()->sentence(3), '.')),
             'es_renovable' => $esRenovable,
             'frecuencia_cantidad' => $esRenovable ? fake()->numberBetween(1, 24) : null,

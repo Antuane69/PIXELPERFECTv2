@@ -1,7 +1,12 @@
-import { Head, Link, usePage } from '@inertiajs/react';
-import { FileCheck2, UserRoundCog } from 'lucide-react';
-import { index as tiposDocumentoIndex } from '@/actions/App/Http/Controllers/TipoDocumentoEmpleadoController';
-import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
+import { Head, Link } from '@inertiajs/react';
+import {
+    BadgeDollarSign,
+    Boxes,
+    Building2,
+    FileText,
+    KeyRound,
+    UserRoundCog,
+} from 'lucide-react';
 import { ResourceHeader } from '@/components/resource-header';
 import {
     Card,
@@ -10,8 +15,13 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { usePermissions } from '@/hooks/use-permissions';
 import { dashboard } from '@/routes';
+import { index as logsIndex } from '@/routes/logs';
+import { index as empresasIndex } from '@/routes/platform/empresas';
+import { index as modulosIndex } from '@/routes/platform/modulos';
+import { index as permisosIndex } from '@/routes/platform/permisos';
+import { index as planesIndex } from '@/routes/platform/planes';
+import { index as usuariosIndex } from '@/routes/platform/usuarios';
 import type { DashboardStats } from '@/types';
 
 type Props = {
@@ -19,26 +29,46 @@ type Props = {
 };
 
 export default function Dashboard({ stats }: Props) {
-    const { can } = usePermissions();
-    const empresa = usePage().props.empresas.activa;
     const cards = [
+        {
+            title: 'Empresas',
+            description: 'Organizaciones registradas',
+            value: stats.empresas,
+            icon: Building2,
+            href: empresasIndex(),
+            accent: 'bg-sky-500/12 text-sky-700 dark:text-sky-300',
+        },
         {
             title: 'Usuarios',
             description: 'Cuentas con acceso al sistema',
             value: stats.users,
             icon: UserRoundCog,
-            href: empresa ? usersIndex(empresa.slug) : dashboard(),
-            permission: 'users.view',
+            href: usuariosIndex(),
             accent: 'bg-violet-500/12 text-violet-700 dark:text-violet-300',
         },
         {
-            title: 'Tipos de documento',
-            description: 'Requisitos documentales activos',
-            value: stats.tiposDocumentoActivos,
-            icon: FileCheck2,
-            href: tiposDocumentoIndex(),
-            permission: '*',
+            title: 'Planes',
+            description: 'Oferta comercial configurada',
+            value: stats.planes,
+            icon: BadgeDollarSign,
+            href: planesIndex(),
             accent: 'bg-teal-500/12 text-teal-700 dark:text-teal-300',
+        },
+        {
+            title: 'Módulos',
+            description: 'Dominios asignables a empresas',
+            value: stats.modules,
+            icon: Boxes,
+            href: modulosIndex(),
+            accent: 'bg-blue-500/12 text-blue-700 dark:text-blue-300',
+        },
+        {
+            title: 'Permisos',
+            description: 'Capacidades disponibles',
+            value: stats.permissions,
+            icon: KeyRound,
+            href: permisosIndex(),
+            accent: 'bg-amber-500/12 text-amber-700 dark:text-amber-300',
         },
     ];
 
@@ -51,12 +81,8 @@ export default function Dashboard({ stats }: Props) {
                     description="Una vista rápida de la operación de Pixel Perfect."
                 />
 
-                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                     {cards.map((card) => {
-                        if (card.value === null || !can(card.permission)) {
-                            return null;
-                        }
-
                         return (
                             <Card
                                 key={card.title}
@@ -92,6 +118,26 @@ export default function Dashboard({ stats }: Props) {
                         );
                     })}
                 </section>
+
+                <Card>
+                    <Link
+                        href={logsIndex()}
+                        className="flex items-center gap-4 p-6"
+                    >
+                        <span className="flex size-11 items-center justify-center rounded-xl bg-rose-500/12 text-rose-700 dark:text-rose-300">
+                            <FileText className="size-5" />
+                        </span>
+                        <div className="grid gap-1">
+                            <CardTitle className="text-base">
+                                Logs del sistema
+                            </CardTitle>
+                            <CardDescription>
+                                Consulta actividad técnica y errores de
+                                plataforma.
+                            </CardDescription>
+                        </div>
+                    </Link>
+                </Card>
 
                 <Card className="border-primary/15 bg-gradient-to-br from-card via-card to-accent/45">
                     <CardHeader>

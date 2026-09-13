@@ -21,8 +21,9 @@ class EmpresaContextTest extends TestCase
         $empresa = Empresa::factory()->activa()->create();
         MembresiaEmpresa::factory()->for($empresa)->for($user)->create();
 
-        $this->actingAs($user)
-            ->get(route('empresas.inicio', $empresa))
+        $this->withEmpresaContext($empresa)
+            ->actingAs($user)
+            ->get(route('empresas.inicio'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('empresas/inicio')
@@ -43,7 +44,11 @@ class EmpresaContextTest extends TestCase
         MembresiaEmpresa::factory()->for($second)->for($user)->create();
 
         $this->actingAs($user)
-            ->get(route('empresas.inicio', $second))
+            ->post(route('empresa-contexto.store'), ['empresa_id' => $second->id])
+            ->assertRedirect(route('empresas.inicio'));
+        $this->assertFalse(session()->has('inertia.flash_data'));
+
+        $this->get(route('empresas.inicio'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('empresas.activa.id', $second->id)
@@ -60,8 +65,8 @@ class EmpresaContextTest extends TestCase
         MembresiaEmpresa::factory()->for($allowed)->for($user)->create();
 
         $this->actingAs($user)
-            ->get(route('empresas.inicio', $forbidden))
-            ->assertNotFound();
+            ->post(route('empresa-contexto.store'), ['empresa_id' => $forbidden->id])
+            ->assertForbidden();
     }
 
     public function test_suspended_membership_is_forbidden_and_not_shared_as_available(): void
@@ -73,11 +78,13 @@ class EmpresaContextTest extends TestCase
         MembresiaEmpresa::factory()->for($allowed)->for($user)->create();
 
         $this->actingAs($user)
-            ->get(route('empresas.inicio', $suspended))
+            ->post(route('empresa-contexto.store'), ['empresa_id' => $suspended->id])
             ->assertForbidden();
 
-        $this->actingAs($user)
-            ->get(route('empresas.inicio', $allowed))
+        $this->post(route('empresa-contexto.store'), ['empresa_id' => $allowed->id])
+            ->assertRedirect(route('empresas.inicio'));
+
+        $this->get(route('empresas.inicio'))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('empresas.disponibles', 1)
                 ->where('empresas.disponibles.0.id', $allowed->id),
@@ -97,7 +104,7 @@ class EmpresaContextTest extends TestCase
             MembresiaEmpresa::factory()->for($empresa)->for($user)->create();
 
             $this->actingAs($user)
-                ->get(route('empresas.inicio', $empresa))
+                ->post(route('empresa-contexto.store'), ['empresa_id' => $empresa->id])
                 ->assertForbidden();
         }
     }
@@ -109,8 +116,9 @@ class EmpresaContextTest extends TestCase
         $unrelated = Empresa::factory()->activa()->create();
         MembresiaEmpresa::factory()->for($allowed)->for($user)->create();
 
-        $this->actingAs($user)
-            ->get(route('empresas.inicio', $allowed))
+        $this->withEmpresaContext($allowed)
+            ->actingAs($user)
+            ->get(route('empresas.inicio'))
             ->assertInertia(fn (Assert $page) => $page
                 ->has('empresas.disponibles', 1)
                 ->where('empresas.disponibles.0.id', $allowed->id)

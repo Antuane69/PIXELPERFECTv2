@@ -90,7 +90,7 @@ export type Empleado = {
     puesto?: Puesto | null;
     estado_civil: string;
     sexo: string;
-    domicilio: string;
+    domicilio: string | null;
     telefono: string;
     avatar_url?: string | null;
     salario_dia?: number | string | null;
@@ -117,8 +117,11 @@ export type Empleado = {
 };
 
 export type DashboardStats = {
-    users: number | null;
-    tiposDocumentoActivos: number | null;
+    empresas: number;
+    users: number;
+    planes: number;
+    modules: number;
+    permissions: number;
 };
 
 export type GrupoEmpresarial = {
@@ -131,6 +134,26 @@ export type Modulo = {
     clave: string;
     nombre: string;
     descripcion?: string | null;
+};
+
+export type PlatformModule = Modulo & {
+    activo: boolean;
+    orden: number;
+    empresas_count: number;
+    permisos_count: number;
+    created_at: string | null;
+};
+
+export type PermissionScope = 'EMPRESA' | 'PLATAFORMA';
+
+export type PlatformPermission = {
+    id: number;
+    name: string;
+    alcance: PermissionScope;
+    modulo_id: number | null;
+    modulo: Pick<Modulo, 'id' | 'clave' | 'nombre'> | null;
+    roles_count: number;
+    created_at: string | null;
 };
 
 export type ModuloEmpresa = Modulo & {
@@ -177,6 +200,7 @@ export type EmpresaAdministrada = {
     nombre_legal: string;
     nombre_comercial: string | null;
     slug: string;
+    logo_url: string | null;
     estado: 'PROSPECTO' | 'DEMO' | 'ACTIVA' | 'VENCIDA' | 'DESACTIVADA';
     demo_ends_at: string | null;
     membresias_count: number;

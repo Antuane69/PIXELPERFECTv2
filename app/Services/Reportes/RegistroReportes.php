@@ -26,6 +26,7 @@ class RegistroReportes
         'empleados' => 'empleados',
         'puestos' => 'puestos',
         'roles' => 'roles',
+        'tipos-documento-empleados' => 'empleados',
         'usuarios' => 'usuarios',
     ];
 

@@ -3,9 +3,11 @@
 namespace Database\Seeders;
 
 use App\Actions\Empresas\CrearRolesPredeterminadosEmpresa;
+use App\AlcancePermiso;
 use App\Models\Empresa;
+use App\Models\Modulo;
+use App\Models\Permission;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
@@ -27,20 +29,62 @@ class RolesAndPermissionsSeeder extends Seeder
             ModuloSeeder::class,
         ]);
 
-        $permissionNames = collect([
-            'users',
-            'roles',
-            'empleados',
-            'puestos',
-            'tipos_documento',
-        ])->crossJoin(['view', 'create', 'update', 'delete'])
-            ->map(static fn (array $parts): string => implode('.', $parts))
-            ->merge(['logs.view', 'logs.delete'])
-            ->push('users.assign_roles');
+        $moduleIds = Modulo::query()->pluck('id', 'clave');
+        $permissionDefinitions = [];
 
-        $permissionNames->each(
-            static fn (string $permission) => Permission::findOrCreate($permission, 'web'),
-        );
+        foreach ([
+            'users' => 'usuarios',
+            'roles' => 'roles',
+            'empleados' => 'empleados',
+            'puestos' => 'puestos',
+            'tipos_documento' => 'empleados',
+        ] as $resource => $moduleKey) {
+            foreach (['view', 'create', 'update', 'delete'] as $action) {
+                $permissionDefinitions[] = [
+                    'name' => "{$resource}.{$action}",
+                    'alcance' => AlcancePermiso::Empresa,
+                    'module_key' => $moduleKey,
+                ];
+            }
+        }
+
+        $permissionDefinitions[] = [
+            'name' => 'users.assign_roles',
+            'alcance' => AlcancePermiso::Empresa,
+            'module_key' => 'usuarios',
+        ];
+        $permissionDefinitions[] = [
+            'name' => 'users.manage_two_factor',
+            'alcance' => AlcancePermiso::Empresa,
+            'module_key' => 'usuarios',
+        ];
+        $permissionDefinitions[] = [
+            'name' => 'users.send_password_reset',
+            'alcance' => AlcancePermiso::Empresa,
+            'module_key' => 'usuarios',
+        ];
+        $permissionDefinitions[] = [
+            'name' => 'logs.view',
+            'alcance' => AlcancePermiso::Plataforma,
+            'module_key' => null,
+        ];
+        $permissionDefinitions[] = [
+            'name' => 'logs.delete',
+            'alcance' => AlcancePermiso::Plataforma,
+            'module_key' => null,
+        ];
+
+        foreach ($permissionDefinitions as $definition) {
+            Permission::query()->firstOrCreate(
+                ['name' => $definition['name'], 'guard_name' => 'web'],
+                [
+                    'alcance' => $definition['alcance'],
+                    'modulo_id' => $definition['module_key'] === null
+                        ? null
+                        : $moduleIds->get($definition['module_key']),
+                ],
+            );
+        }
 
         Empresa::query()
             ->select('id')

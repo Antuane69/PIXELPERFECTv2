@@ -18,7 +18,7 @@ export function AppSidebar() {
     const { auth } = usePage().props;
     const { empresas } = usePage().props;
     const permissions = auth.user?.permissions ?? [];
-    const navigationItems = mainNavItems(empresas.activa?.slug);
+    const navigationItems = mainNavItems(empresas.activa !== null);
     const items = visibleNavItems(
         navigationItems,
         permissions,

@@ -40,6 +40,8 @@ class EmpresaController extends Controller
                 'slug',
                 'estado',
                 'demo_ends_at',
+                'logo',
+                'logo_mime_type',
                 'created_at',
             ])
             ->with('grupoEmpresarial:id,nombre')
@@ -67,6 +69,7 @@ class EmpresaController extends Controller
                 'nombre_legal' => $empresa->nombre_legal,
                 'nombre_comercial' => $empresa->nombre_comercial,
                 'slug' => $empresa->slug,
+                'logo_url' => self::logoDataUri($empresa->logo, $empresa->logo_mime_type),
                 'estado' => $empresa->estado->value,
                 'demo_ends_at' => $empresa->demo_ends_at?->toISOString(),
                 'membresias_count' => $empresa->membresias_count,
@@ -104,6 +107,15 @@ class EmpresaController extends Controller
         ]);
     }
 
+    private static function logoDataUri(?string $contents, ?string $mimeType): ?string
+    {
+        if ($contents === null || $mimeType === null) {
+            return null;
+        }
+
+        return "data:{$mimeType};base64,".base64_encode($contents);
+    }
+
     public function store(StoreEmpresaRequest $request, CrearEmpresa $crearEmpresa): RedirectResponse
     {
         $empresa = $crearEmpresa->handle(
@@ -112,11 +124,13 @@ class EmpresaController extends Controller
             grupoEmpresarialId: $request->grupoEmpresarialId(),
             rfc: $request->rfc(),
             correoContacto: $request->correoContacto(),
+            codigoPaisContacto: $request->codigoPaisContacto(),
             telefonoContacto: $request->telefonoContacto(),
             zonaHoraria: $request->zonaHoraria(),
             moneda: $request->moneda(),
             estado: $request->estado(),
             demoEndsAt: $request->demoEndsAt(),
+            logo: $request->file('logo'),
         );
 
         Inertia::flash('toast', [

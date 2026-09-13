@@ -9,6 +9,8 @@ use LogicException;
 
 class EmpresaContext
 {
+    public const SESSION_KEY = 'empresa_contexto_id';
+
     private ?Empresa $empresa = null;
 
     private ?MembresiaEmpresa $membresia = null;
