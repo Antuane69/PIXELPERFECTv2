@@ -48,6 +48,7 @@ export default function UsersIndex({
     passwordRules,
 }: Props) {
     const { can } = usePermissions();
+    const { auth } = usePage().props;
     const empresa = usePage().props.empresas.activa;
 
     if (!empresa) {
@@ -57,6 +58,8 @@ export default function UsersIndex({
     const canAssignRoles = can('users.assign_roles');
     const canManageTwoFactor = can('users.manage_two_factor');
     const canSendPasswordReset = can('users.send_password_reset');
+    const isPlatformAdministrator =
+        auth.user?.es_superadministrador_plataforma ?? false;
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<ManagedUser | null>(null);
     const [deleting, setDeleting] = useState<ManagedUser | null>(null);
@@ -141,18 +144,22 @@ export default function UsersIndex({
                             <Pencil />
                         </Button>
                     )}
-                    {can('users.delete') && (
-                        <Button
-                            type="button"
-                            size="icon"
-                            variant="outline"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => setDeleting(user)}
-                            aria-label={`Eliminar a ${user.name}`}
-                        >
-                            <Trash2 />
-                        </Button>
-                    )}
+                    {can('users.delete') &&
+                        (isPlatformAdministrator ||
+                            !(user.roles ?? []).some(
+                                (role) => roleName(role) === 'Administrador',
+                            )) && (
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setDeleting(user)}
+                                aria-label={`Eliminar a ${user.name}`}
+                            >
+                                <Trash2 />
+                            </Button>
+                        )}
                 </div>
             ),
         },

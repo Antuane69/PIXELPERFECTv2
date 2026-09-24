@@ -9,6 +9,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class PlatformUserManagementTest extends TestCase
@@ -105,6 +106,35 @@ class PlatformUserManagementTest extends TestCase
         }
 
         setPermissionsTeamId(null);
+    }
+
+    public function test_platform_created_company_administrator_appears_in_company_user_catalog(): void
+    {
+        $platformAdministrator = User::factory()->superadministradorPlataforma()->create();
+        $companyAdministrator = User::factory()->create();
+        $empresa = Empresa::factory()->activa()->create();
+        $this->addAdministratorMembership($companyAdministrator, $empresa);
+
+        $this->actingAs($platformAdministrator)
+            ->post(route('platform.usuarios.store'), [
+                'empresa_ids' => [$empresa->id],
+                'name' => 'Administrador Asignado',
+                'email' => 'administrador-asignado@example.com',
+                'password' => 'Secure-password1!',
+                'password_confirmation' => 'Secure-password1!',
+            ])
+            ->assertRedirect(route('platform.usuarios.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->withEmpresaContext($empresa)
+            ->actingAs($companyAdministrator)
+            ->get(route('empresas.users.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('users/index')
+                ->where('users.data', fn (mixed $users): bool => collect($users)
+                    ->contains(fn (array $user): bool => $user['email'] === 'administrador-asignado@example.com')),
+            );
     }
 
     public function test_platform_administrator_can_update_and_delete_user_from_platform_catalog(): void

@@ -388,6 +388,23 @@ class UserManagementTest extends TestCase
         $this->assertModelExists($this->administrator);
     }
 
+    public function test_company_administrator_cannot_delete_another_company_administrator(): void
+    {
+        $otherAdministrator = User::factory()->create();
+        $this->addToEmpresa($otherAdministrator);
+        $otherAdministrator->assignRole('Administrador');
+
+        $this->actingAs($this->administrator)
+            ->delete(route('empresas.users.destroy', ['user' => $otherAdministrator]))
+            ->assertForbidden();
+
+        $this->assertModelExists($otherAdministrator);
+        $this->assertDatabaseHas('membresias_empresa', [
+            'empresa_id' => $this->empresa->id,
+            'user_id' => $otherAdministrator->id,
+        ]);
+    }
+
     private function addToEmpresa(User $user): User
     {
         MembresiaEmpresa::factory()->for($this->empresa)->for($user)->create();

@@ -45,7 +45,9 @@ class UserPolicy
     public function delete(User $user, User $model): bool
     {
         return $user->can('users.delete')
-            && (! $model->hasRole('Administrador', 'web') || $user->hasRole('Administrador', 'web'));
+            && ($user->is($model)
+                || $user->es_superadministrador_plataforma
+                || ! $model->hasRole('Administrador', 'web'));
     }
 
     /**

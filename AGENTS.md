@@ -59,6 +59,68 @@ Every new module must use the existing application as its contract. Choose refer
 - Use `Empleados` for complex forms, private files, child records, atomic mutations, restore rules, and responsive tables.
 - Reuse the smallest compatible pattern. Do not copy unrelated fields, rules, or abstractions from a reference module.
 
+### Global UI and Form Contract
+
+Every new module must preserve the system UI contract. Before creating a component, inspect and reuse the global component that already owns the interaction:
+
+- CRUD creation and editing use `ResourceFormDialog`; destructive confirmation uses `ConfirmDeleteDialog`.
+- Listings use `ResourceTable` and `ResourcePagination`; page context uses `Breadcrumbs`.
+- Search and visible filters use `ResourceSearch` and the global, composable `FiltrosBase`. Extend `resources/js/components/filtros-base.tsx` backward-compatibly when its API is insufficient; never implement a module-local duplicate of search or filter controls.
+- Detail views use `ResourceDetailDrawer`; `EmpleadoDetailDrawer` is the behavior and layout reference. Long or complex create/edit flows use `ResourceFormDrawer` only when a dialog is unsuitable.
+- Module-specific files may compose global components under `resources/js/features/<module>/`, but must not duplicate their layout, controls, accessibility behavior, loading states, or visual styles. Improve the global component with backward-compatible props or slots when a reusable capability is missing.
+
+All modules must use same design system from `resources/css/app.css` and shared `resources/js/components/ui/` primitives. Reuse semantic theme tokens for background, foreground, primary, secondary, muted, accent, destructive, border, input, ring, sidebar, radius, and typography; do not introduce hard-coded hex, `oklch`, or unrelated Tailwind color values in pages or feature components. Reuse global buttons, inputs, labels, dialogs, drawers, table spacing, typography scale, icon sizing, focus states, responsive breakpoints, and dark-mode behavior. New screens must match global colors, fonts, alignment, spacing, positions, button variants, and interaction feedback; color alone must never convey state.
+
+`resources/js/components/forms/form-utils.ts` is canonical client-side form normalization and format utility. Add reusable normalizers, formatters, and validation helpers there before using a new input rule; every applicable field must consume those helpers through `normalizeInput` or an equivalent shared API. Never duplicate regexes, `onChange` sanitization, or formatting rules inside a page or feature component.
+
+- Integer fields use a shared digits-only normalizer, `inputMode="numeric"`, and a domain-defined maximum length. They reject letters, signs, decimal points, exponent notation, and other non-digits.
+- Decimal and money fields use a shared decimal normalizer, `inputMode="decimal"`, no letters or extra separators, and at most two decimal places. Format to two decimals only when business contract requires fixed scale; preserve incomplete user entry while typing.
+- Identifier, RFC, CURP, username, file, date, phone, email, currency, percentage, and other repeated formats must have a named global helper with explicit options for domain limits. Do not silently transform a valid, non-empty value beyond its stated contract.
+- Client normalization provides immediate feedback only. Laravel Form Requests remain authoritative: validate type, requiredness, bounds, precision, uniqueness, permissions, and cross-field business rules server-side, and return accessible field errors.
+- When a global helper changes, update or add focused tests for it and verify every affected form retains same accepted input, formatted output, and server validation contract.
+
+### Multi-company and Platform Contract
+
+This application is a multi-company platform, not a single-tenant application with an optional company field.
+
+- The selected tenant is `EmpresaContext::SESSION_KEY` (`empresa_contexto_id`). `InicializarContextoPermisos` restores it, initializes Spatie's team with `setPermissionsTeamId($empresa->id)`, clears stale relations, and adds request context. Do not read, cache, or set a tenant from client input.
+- `EstablecerEmpresaActiva` protects company routes. A regular user without an active eligible membership goes to `empresa-contexto.create`; a platform superadministrator can select any company or return to platform routes.
+- Use `platform.admin` only for platform capabilities: plans, companies, modules, permissions, platform users, and logs. Use `empresa.activa` plus `modulo.habilitado:<clave>` for tenant modules. Never make a tenant route usable merely because its navigation item is hidden.
+- Every tenant record and child record must be scoped by active `empresa_id` in queries, Form Requests, Policies, route bindings, exports, downloads, activity logs, and storage paths. Never trust an `empresa_id` submitted in a tenant form.
+- Company users belong through `membresias_empresa`; roles and permissions are team-scoped. A shared user can have different roles in each company. Preserve the last active company administrator and protect cross-company updates, deletes, file access, and role assignment.
+- Platform superadministrator is an explicit exception (`es_superadministrador_plataforma`), not a company role. Check this flag server-side and keep it out of tenant role synchronization.
+
+### Adding or Extending a Module
+
+Before coding, write the module contract and choose the smallest comparable module. Then implement every applicable item below in one coherent change:
+
+1. Define platform or tenant ownership, module key, actors, permissions, enabled-module behavior, data ownership, lifecycle, audit events, filters, reports, files, and explicit `No verificable` business rules.
+2. For a tenant module, register its key in `database/seeders/ModuloSeeder.php`, seed its permissions in `RolesAndPermissionsSeeder`, add `modulo.habilitado:<clave>` to routes, expose navigation only when active, and ensure newly created companies receive the entitlement. Platform-only features must not be added to this tenant registry by accident.
+3. Create migration, model, factory, and relevant seeder; include `empresa_id`, foreign keys, composite uniqueness and indexes required by tenant-scoped search and ordering. Use `SoftDeletes` and restore rules when historical data must remain available.
+4. Add named routes, Policy, separate Store/Update Form Requests, a focused Action or Service for atomic/domain work, and an Inertia response with typed props. Generate and consume Wayfinder actions/routes; never hand-code application URLs.
+5. Build page as composition: shared header, `FiltrosBase`, table, pagination, dialogs/drawers, confirmation, loading, error, archived, empty, permission, keyboard, responsive and mobile states. Keep business-specific UI under `resources/js/features/<module>/` when reusable only inside that module.
+6. Register exports in `RegistroReportes` when required. Exports must apply same authorization, active-company scope and normalized filters as listing; PDF and Excel must use active company's logo/name only. Sensitive tenant logo or file data must never fall back to an unrelated company's brand.
+7. Update sidebar/dashboard visibility, shared TypeScript domain types, translations/messages, module entitlement tests, and all affected role/permission count expectations. Re-run `php artisan wayfinder:generate --with-form --no-interaction` through `npm run types:check` after route changes.
+
+### Authentication, Email, and Two-Factor Contract
+
+- User model implements `MustVerifyEmail`. Creation or email change queues `SendEmailVerificationEmail` after commit; verification uses Laravel's signed, expiring `verification.verify` route. Protected business routes require `verified`.
+- Test new-user creation, resend, invalid/expired/tampered link, successful verification, email change revocation, and queued mail content. Use `Queue::fake()`/`Mail::fake()` in automated tests. Do not test real SMTP against a personal or customer mailbox without an explicitly authorized test recipient.
+- Self-service two-factor setup must show QR/manual key, require a valid authenticator code before confirmation, expose recovery codes, and support authenticated login challenge/recovery code tests. An administrator must not mark another user's random secret as confirmed: forced enrollment needs a separately designed, user-completable flow.
+- Password-reset sending is permission-gated and must remain tenant-scoped. Never expose secrets, recovery codes, signed URLs, passwords, or raw two-factor fields in Inertia props, logs, exports, or UI state.
+
+### Release Validation Matrix
+
+Every module or cross-cutting change must prove applicable paths for:
+
+- guest, unverified user, normal company user, company administrator, platform superadministrator, one-company user, and user shared by multiple companies;
+- create, read, update, delete, archive/restore, protected-record, invalid input, authorization denial, duplicate request, active/inactive catalog and dependent-record behavior;
+- search, each visible filter, clearing filters, deterministic order, bounded pagination, second-page query preservation, empty/archived results, export filters and tenant isolation;
+- desktop and mobile UI, keyboard/focus, label/error association, loading, success/error feedback, dark mode, and use of shared design primitives;
+- tenant-safe PDFs/Excel files, authorized previews/downloads, image compression, rollback/cleanup, activity logs, mail/queue jobs, email verification, two-factor challenge, and recovery codes when those concerns apply.
+
+Do not use fixed permission totals in assertions. Assert named permissions or derive expected counts from the seeded definitions so adding a valid permission cannot silently break unrelated coverage.
+
 ### Define the Module Contract First
 
 Before implementation, enumerate:
