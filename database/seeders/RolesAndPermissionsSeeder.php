@@ -36,6 +36,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'users' => 'usuarios',
             'roles' => 'roles',
             'empleados' => 'empleados',
+            'empleados_carpetas' => 'empleados',
+            'empleados_documentos_catalogo' => 'empleados',
             'puestos' => 'puestos',
             'tipos_documento' => 'empleados',
         ] as $resource => $moduleKey) {

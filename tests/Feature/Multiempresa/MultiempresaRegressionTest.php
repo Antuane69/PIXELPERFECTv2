@@ -143,12 +143,10 @@ class MultiempresaRegressionTest extends TestCase
         $logs = Permission::findByName('logs.view', 'web');
         $this->withEmpresaContext($empresa)
             ->actingAs($actor)->get(route('empresas.roles.index'))
-            ->assertOk()->assertInertia(fn (Assert $page) => $page->has('permissions', 21)
-            ->where('permissions', fn ($permissions): bool => ! collect($permissions)->contains(
-                fn (array $permission): bool => in_array($permission['name'], [
-                    'logs.view',
-                ], true),
-            )));
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('permissions', fn (mixed $permissions): bool => collect($permissions)->pluck('name')->contains('users.view')
+                && ! collect($permissions)->pluck('name')->contains('logs.view')
+                && ! collect($permissions)->pluck('name')->contains('logs.delete')));
         $this->post(route('empresas.roles.store'), ['name' => 'Viewer', 'permissions' => [$view->id]])
             ->assertSessionHasNoErrors();
         $role = Role::where('empresa_id', $empresa->id)->where('name', 'Viewer')->firstOrFail();

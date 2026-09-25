@@ -8,7 +8,10 @@ use App\Http\Controllers\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Admin\PlatformUserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DownloadEmpleadoDocumentoController;
+use App\Http\Controllers\EmpleadoCarpetaController;
 use App\Http\Controllers\EmpleadoController;
+use App\Http\Controllers\EmpleadoDocumentoCatalogoController;
+use App\Http\Controllers\EmpleadoDocumentoImpresionController;
 use App\Http\Controllers\EmpresaContextController;
 use App\Http\Controllers\EmpresaDashboardController;
 use App\Http\Controllers\ExportController;
@@ -85,6 +88,62 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
                         ->only(['index', 'store', 'update', 'destroy']);
                 });
                 Route::middleware('modulo.habilitado:empleados')->group(function (): void {
+                    Route::patch(
+                        'empleados/catalogos/documentos/{empleadoDocumentoCatalogo}/restaurar',
+                        [EmpleadoDocumentoCatalogoController::class, 'restore'],
+                    )->withTrashed()->name('empleados.documentos-catalogo.restore');
+                    Route::get(
+                        'empleados/catalogos/documentos/{empleadoDocumentoCatalogo}/descargar',
+                        [EmpleadoDocumentoCatalogoController::class, 'download'],
+                    )->name('empleados.documentos-catalogo.download');
+                    Route::get(
+                        'empleados/catalogos/documentos/{empleadoDocumentoCatalogo}',
+                        [EmpleadoDocumentoCatalogoController::class, 'show'],
+                    )->name('empleados.documentos-catalogo.show');
+                    Route::get(
+                        'empleados/catalogos/documentos',
+                        [EmpleadoDocumentoCatalogoController::class, 'index'],
+                    )->name('empleados.documentos-catalogo.index');
+                    Route::post(
+                        'empleados/catalogos/documentos',
+                        [EmpleadoDocumentoCatalogoController::class, 'store'],
+                    )->name('empleados.documentos-catalogo.store');
+                    Route::put(
+                        'empleados/catalogos/documentos/{empleadoDocumentoCatalogo}',
+                        [EmpleadoDocumentoCatalogoController::class, 'update'],
+                    )->name('empleados.documentos-catalogo.update');
+                    Route::delete(
+                        'empleados/catalogos/documentos/{empleadoDocumentoCatalogo}',
+                        [EmpleadoDocumentoCatalogoController::class, 'destroy'],
+                    )->name('empleados.documentos-catalogo.destroy');
+                    Route::get(
+                        'empleados/{empleado}/imprimir-documentos',
+                        [EmpleadoDocumentoImpresionController::class, 'seleccionar'],
+                    )->name('empleados.documentos-catalogo.seleccionar');
+                    Route::get(
+                        'empleados/{empleado}/imprimir-documentos/descargar',
+                        [EmpleadoDocumentoImpresionController::class, 'descargar'],
+                    )->name('empleados.documentos-catalogo.imprimir');
+                    Route::patch(
+                        'empleados/carpetas/{empleadoCarpeta}/restaurar',
+                        [EmpleadoCarpetaController::class, 'restore'],
+                    )->withTrashed()->name('empleados.carpetas.restore');
+                    Route::get(
+                        'empleados/carpetas',
+                        [EmpleadoCarpetaController::class, 'index'],
+                    )->name('empleados.carpetas.index');
+                    Route::post(
+                        'empleados/carpetas',
+                        [EmpleadoCarpetaController::class, 'store'],
+                    )->name('empleados.carpetas.store');
+                    Route::put(
+                        'empleados/carpetas/{empleadoCarpeta}',
+                        [EmpleadoCarpetaController::class, 'update'],
+                    )->name('empleados.carpetas.update');
+                    Route::delete(
+                        'empleados/carpetas/{empleadoCarpeta}',
+                        [EmpleadoCarpetaController::class, 'destroy'],
+                    )->name('empleados.carpetas.destroy');
                     Route::patch('empleados/{empleado}/restaurar', [EmpleadoController::class, 'restore'])
                         ->withTrashed()
                         ->name('empleados.restore');

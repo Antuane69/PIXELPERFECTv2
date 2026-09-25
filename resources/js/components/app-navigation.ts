@@ -1,17 +1,20 @@
 import {
-    BriefcaseBusiness,
-    Boxes,
-    Building2,
-    FileCheck2,
-    FileText,
     BadgeDollarSign,
+    BriefcaseBusiness,
+    Building2,
+    Boxes,
+    FileText,
+    Folder,
+    FolderOpen,
     KeyRound,
     LayoutDashboard,
     ShieldCheck,
     UserRoundCog,
     UsersRound,
 } from 'lucide-react';
+import { index as carpetasEmpleadosIndex } from '@/actions/App/Http/Controllers/EmpleadoCarpetaController';
 import { index as empleadosIndex } from '@/actions/App/Http/Controllers/EmpleadoController';
+import { index as documentosCatalogoIndex } from '@/actions/App/Http/Controllers/EmpleadoDocumentoCatalogoController';
 import { index as puestosIndex } from '@/actions/App/Http/Controllers/PuestoController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
 import { index as tiposDocumentoIndex } from '@/actions/App/Http/Controllers/TipoDocumentoEmpleadoController';
@@ -56,18 +59,48 @@ export function mainNavItems(hasEmpresaContext = false): NavItem[] {
                 module: 'puestos',
             },
             {
-                title: 'Documentos',
-                href: tiposDocumentoIndex(),
-                icon: FileCheck2,
-                permission: 'tipos_documento.view',
-                module: 'empleados',
-            },
-            {
                 title: 'Empleados',
                 href: empleadosIndex(),
                 icon: UsersRound,
-                permission: 'empleados.view',
                 module: 'empleados',
+                children: [
+                    {
+                        title: 'Panel',
+                        href: empleadosIndex(),
+                        icon: LayoutDashboard,
+                        permission: 'empleados.view',
+                        module: 'empleados',
+                    },
+                    {
+                        title: 'Catálogos',
+                        href: carpetasEmpleadosIndex(),
+                        icon: FolderOpen,
+                        children: [
+                            {
+                                title: 'Carpetas',
+                                href: carpetasEmpleadosIndex(),
+                                icon: Folder,
+                                permission: 'empleados_carpetas.view',
+                                module: 'empleados',
+                            },
+                            {
+                                title: 'Documentos',
+                                href: documentosCatalogoIndex(),
+                                icon: FileText,
+                                permission:
+                                    'empleados_documentos_catalogo.view',
+                                module: 'empleados',
+                            },
+                            {
+                                title: 'Tipos de documento',
+                                href: tiposDocumentoIndex(),
+                                icon: FileText,
+                                permission: 'tipos_documento.view',
+                                module: 'empleados',
+                            },
+                        ],
+                    },
+                ],
             },
         ];
     }
@@ -122,20 +155,28 @@ export function visibleNavItems(
     permissions: string[],
     isPlatformAdministrator = false,
     enabledModules: string[] = [],
-) {
-    return items.filter((item) => {
-        if (item.platformOnly && !isPlatformAdministrator) {
-            return false;
+): NavItem[] {
+    return items.flatMap((item) => {
+        const children = item.children
+            ? visibleNavItems(
+                  item.children,
+                  permissions,
+                  isPlatformAdministrator,
+                  enabledModules,
+              )
+            : undefined;
+
+        if (
+            (item.platformOnly && !isPlatformAdministrator) ||
+            (item.module && !enabledModules.includes(item.module)) ||
+            (item.permission &&
+                !permissions.includes('*') &&
+                !permissions.includes(item.permission)) ||
+            (item.children && !children?.length)
+        ) {
+            return [];
         }
 
-        if (item.module && !enabledModules.includes(item.module)) {
-            return false;
-        }
-
-        return (
-            !item.permission ||
-            permissions.includes('*') ||
-            permissions.includes(item.permission)
-        );
+        return [{ ...item, ...(children ? { children } : {}) }];
     });
 }

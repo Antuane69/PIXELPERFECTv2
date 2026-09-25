@@ -261,6 +261,10 @@ export default function EmpleadosIndex({
                 <EmpleadoDetailDrawer
                     empleado={viewing}
                     tiposDocumento={tiposDocumento}
+                    canPrintDocuments={
+                        can('empleados.view') &&
+                        can('empleados_documentos_catalogo.view')
+                    }
                     open
                     onOpenChange={(open) => !open && setViewing(null)}
                     onEdit={

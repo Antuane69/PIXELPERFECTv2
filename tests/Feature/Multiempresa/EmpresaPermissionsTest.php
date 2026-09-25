@@ -68,7 +68,8 @@ class EmpresaPermissionsTest extends TestCase
 
         $this->assertSame($empresa->id, $role->empresa_id);
         $this->assertTrue($role->esProtegido());
-        $this->assertCount(21, $role->permissions);
+        $this->assertTrue($role->hasPermissionTo('users.view'));
+        $this->assertTrue($role->hasPermissionTo('users.assign_roles'));
         $this->assertFalse($role->hasPermissionTo('logs.view'));
         $this->assertFalse($role->hasPermissionTo('logs.delete'));
         $this->assertTrue($role->hasPermissionTo('tipos_documento.view'));

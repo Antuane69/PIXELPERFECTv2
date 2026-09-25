@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Date;
 use Mockery\MockInterface;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Tests\TestCase;
@@ -159,6 +160,44 @@ class ExportarReporteTest extends TestCase
         $this->assertFalse($sheet->getShowGridlines());
 
         $spreadsheet->disconnectWorksheets();
+    }
+
+    public function test_excel_export_keeps_formula_like_values_as_text(): void
+    {
+        $formulaLikeValue = '=HYPERLINK("https://example.com","Abrir")';
+        Puesto::factory()->for($this->empresa)->create(['nombre' => $formulaLikeValue]);
+
+        $response = $this->actingAs($this->administrator)
+            ->post(route('reportes.exportar', 'puestos'), ['formato' => 'xlsx'])
+            ->assertOk()
+            ->assertDownload('puestos_20260812_100000.xlsx');
+
+        $spreadsheet = IOFactory::load($response->baseResponse->getFile()->getPathname());
+        $cell = $spreadsheet->getActiveSheet()->getCell('B6');
+
+        $this->assertSame($formulaLikeValue, $cell->getValue());
+        $this->assertSame(DataType::TYPE_STRING, $cell->getDataType());
+
+        $spreadsheet->disconnectWorksheets();
+    }
+
+    public function test_missing_company_logo_uses_platform_logo_fallback(): void
+    {
+        $platformLogoPath = public_path('brand/pixel-perfect-banner.png');
+        $platformLogo = file_get_contents($platformLogoPath);
+        $platformLogoMimeType = mime_content_type($platformLogoPath);
+        $config = ExportConfig::make()
+            ->brandName($this->empresa->nombre_legal)
+            ->logoContents($this->empresa->logo, $this->empresa->logo_mime_type);
+
+        $this->assertSame($platformLogoPath, $config->getLogoPath());
+        $this->assertSame($platformLogo, $config->getLogoContents());
+        $this->assertSame($platformLogoMimeType, $config->getLogoMimeType());
+        $this->assertSame($this->empresa->nombre_legal, $config->getBrandName());
+        $this->assertSame(
+            'data:'.$platformLogoMimeType.';base64,'.base64_encode((string) $platformLogo),
+            $config->getLogoDataUri(),
+        );
     }
 
     public function test_excel_export_embeds_active_company_logo(): void

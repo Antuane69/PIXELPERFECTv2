@@ -6,6 +6,7 @@ use App\Services\Reportes\ExportConfig;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -65,7 +66,18 @@ class ExcelDriver
         $index = 1;
 
         foreach ($records as $record) {
-            $sheet->fromArray($this->config->formatRow($record, $index++), null, "A{$rowNumber}");
+            foreach ($this->config->formatRow($record, $index++) as $columnIndex => $value) {
+                $coordinate = $this->columnLetter($columnIndex + 1).$rowNumber;
+
+                if (is_string($value) || $value instanceof \Stringable) {
+                    $sheet->setCellValueExplicit($coordinate, (string) $value, DataType::TYPE_STRING);
+
+                    continue;
+                }
+
+                $sheet->setCellValue($coordinate, $value);
+            }
+
             $rowNumber++;
         }
 

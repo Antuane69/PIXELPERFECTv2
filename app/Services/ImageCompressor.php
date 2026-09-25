@@ -24,10 +24,27 @@ final class ImageCompressor
             return null;
         }
 
-        $contents = $file->getContent();
+        return $this->compressContentsIfImage($file->getContent(), $mimeType);
+    }
+
+    /**
+     * @return array{contents: string, mime_type: string, extension: string}|null
+     */
+    public function compressContentsIfImage(
+        string $contents,
+        string $mimeType,
+        bool $enforceSourcePixelLimit = false,
+    ): ?array {
+        if (! in_array($mimeType, self::SUPPORTED_MIME_TYPES, true)) {
+            return null;
+        }
 
         if ($contents === '') {
             throw new RuntimeException('No se pudo leer la imagen subida.');
+        }
+
+        if ($enforceSourcePixelLimit && ! $this->isWithinConfiguredLimits($contents, $mimeType)) {
+            throw new RuntimeException('La imagen no es válida o supera el límite de píxeles permitido.');
         }
 
         $source = @imagecreatefromstring($contents);
@@ -49,6 +66,22 @@ final class ImageCompressor
             'mime_type' => $mimeType,
             'extension' => $this->extensionForMimeType($mimeType),
         ];
+    }
+
+    public function isWithinConfiguredLimits(string $contents, string $mimeType): bool
+    {
+        $imageInfo = @getimagesizefromstring($contents);
+
+        if (! is_array($imageInfo)
+            || $imageInfo['mime'] !== $mimeType
+            || $imageInfo[0] < 1
+            || $imageInfo[1] < 1) {
+            return false;
+        }
+
+        $maxSourcePixels = max((int) config('media.images.max_source_pixels', 25000000), 1);
+
+        return $imageInfo[0] <= intdiv($maxSourcePixels, $imageInfo[1]);
     }
 
     private function resizeIfNeeded(\GdImage $source, string $mimeType): \GdImage

@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import {
     BriefcaseBusiness,
     CalendarDays,
@@ -10,12 +11,14 @@ import {
     Mail,
     Pencil,
     Phone,
+    Printer,
     Trash2,
     UserRound,
     WalletCards,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { seleccionar as seleccionarDocumentos } from '@/actions/App/Http/Controllers/EmpleadoDocumentoImpresionController';
 import { ImagePreview } from '@/components/forms/image-preview';
 import { ResourceDetailDrawer } from '@/components/resource-detail-drawer';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +37,7 @@ type Props = {
     onOpenChange: (open: boolean) => void;
     onEdit?: () => void;
     onDelete?: () => void;
+    canPrintDocuments?: boolean;
 };
 
 type DetailTab = 'informacion' | 'documentos';
@@ -52,6 +56,7 @@ export function EmpleadoDetailDrawer({
     onOpenChange,
     onEdit,
     onDelete,
+    canPrintDocuments = false,
 }: Props) {
     const [activeTab, setActiveTab] = useState<DetailTab>('informacion');
     const documentRows = buildDocumentRows(empleado, tiposDocumento);
@@ -89,6 +94,13 @@ export function EmpleadoDetailDrawer({
                             onClick={onDelete}
                         >
                             <Trash2 /> Eliminar
+                        </Button>
+                    ) : null}
+                    {canPrintDocuments && !empleado.deleted_at ? (
+                        <Button asChild type="button" variant="outline">
+                            <Link href={seleccionarDocumentos.url(empleado.id)}>
+                                <Printer /> Imprimir documentos
+                            </Link>
                         </Button>
                     ) : null}
                     <Button

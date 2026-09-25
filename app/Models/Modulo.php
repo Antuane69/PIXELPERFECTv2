@@ -25,6 +25,20 @@ class Modulo extends Model
             ->withTimestamps();
     }
 
+    /**
+     * @return BelongsToMany<EmpleadoDocumentoCatalogo, $this>
+     */
+    public function documentosCatalogo(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            EmpleadoDocumentoCatalogo::class,
+            'empleados_documentos_catalogo_modulos',
+            'modulo_id',
+            'empleado_documento_catalogo_id',
+        )
+            ->withPivot('empresa_id');
+    }
+
     /** @return HasMany<Permission, $this> */
     public function permisos(): HasMany
     {

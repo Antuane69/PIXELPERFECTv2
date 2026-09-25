@@ -56,6 +56,27 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * @return HasMany<EmpleadoCarpeta, $this>
+     */
+    public function empleadoCarpetasCreadas(): HasMany
+    {
+        return $this->hasMany(EmpleadoCarpeta::class, 'creado_por_id');
+    }
+
+    /**
+     * @return BelongsToMany<EmpleadoCarpeta, $this>
+     */
+    public function empleadoCarpetasConAcceso(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            EmpleadoCarpeta::class,
+            'empleados_carpetas_usuarios',
+            'user_id',
+            'empleado_carpeta_id',
+        )->withPivot('empresa_id')->withTimestamps();
+    }
+
+    /**
      * @return BelongsToMany<Empresa, $this>
      */
     public function empresas(): BelongsToMany

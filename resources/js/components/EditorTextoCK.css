@@ -1,0 +1,149 @@
+.editor-texto-ck {
+    min-width: 0;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 8px color-mix(in oklch, var(--foreground) 5%, transparent);
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.editor-texto-ck > textarea {
+    display: none;
+}
+
+.editor-texto-ck .cke {
+    width: 100% !important;
+    overflow: hidden;
+    border: 0 !important;
+    border-radius: inherit;
+    box-shadow: none !important;
+    background: var(--card);
+    font-family: inherit;
+}
+
+.editor-texto-ck .cke_inner {
+    background: var(--card);
+}
+
+.editor-texto-ck .cke_top {
+    padding: 8px 10px 3px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--border) !important;
+    box-shadow: none !important;
+    background: color-mix(in oklch, var(--primary) 6%, var(--card)) !important;
+    background-image: none !important;
+    filter: none !important;
+}
+
+.editor-texto-ck .cke_toolgroup,
+.editor-texto-ck a.cke_combo_button {
+    margin: 0 6px 5px 0 !important;
+    border: 1px solid var(--input) !important;
+    border-radius: 6px;
+    box-shadow: none !important;
+    background: var(--card) !important;
+    background-image: none !important;
+    filter: none !important;
+}
+
+.editor-texto-ck a.cke_button {
+    height: 18px;
+    padding: 5px 7px;
+    color: var(--muted-foreground);
+}
+
+.editor-texto-ck a.cke_button_off:hover,
+.editor-texto-ck a.cke_button_off:focus,
+.editor-texto-ck a.cke_button_off:active,
+.editor-texto-ck .cke_combo_off a.cke_combo_button:hover,
+.editor-texto-ck .cke_combo_off a.cke_combo_button:focus {
+    border-color: var(--ring) !important;
+    outline: 0;
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent) !important;
+    background: color-mix(in oklch, var(--primary) 10%, var(--card)) !important;
+}
+
+.editor-texto-ck a.cke_button_on,
+.editor-texto-ck a.cke_button_on:hover,
+.editor-texto-ck a.cke_button_on:focus,
+.editor-texto-ck a.cke_button_on:active,
+.editor-texto-ck .cke_combo_on a.cke_combo_button {
+    border-radius: 5px;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring) 18%, transparent)
+        inset !important;
+    background: var(--secondary) !important;
+}
+
+.editor-texto-ck a.cke_button_disabled,
+.editor-texto-ck .cke_combo_disabled a.cke_combo_button {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.editor-texto-ck .cke_combo_text {
+    color: var(--foreground);
+    text-shadow: none;
+}
+
+.editor-texto-ck .cke_combo_arrow {
+    border-top-color: var(--muted-foreground);
+}
+
+.editor-texto-ck .cke_toolbar_separator {
+    height: 20px;
+    margin-top: 4px;
+    background: var(--border);
+    box-shadow: none;
+}
+
+.editor-texto-ck .cke_contents {
+    background: var(--card);
+}
+
+.editor-texto-ck .cke_contents iframe {
+    display: block;
+    max-width: 100%;
+}
+
+.editor-texto-ck .cke_bottom {
+    display: none;
+}
+
+.editor-texto-ck:focus-within {
+    border-color: var(--ring);
+    box-shadow:
+        0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent),
+        0 2px 8px color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+
+.editor-texto-ck__error {
+    margin: 0.5rem 0.75rem 0.75rem;
+    color: var(--destructive);
+    font-size: 0.8125rem;
+}
+
+/* El contenido se muestra también fuera del iframe al consultar el ticket. */
+.editor-texto-ck img {
+    max-width: 100% !important;
+    height: auto;
+}
+
+@media (max-width: 640px) {
+    .editor-texto-ck .cke_top {
+        padding: 6px 7px 2px !important;
+    }
+
+    .editor-texto-ck a.cke_button {
+        padding-right: 6px;
+        padding-left: 6px;
+    }
+
+    .editor-texto-ck .cke_toolgroup,
+    .editor-texto-ck a.cke_combo_button {
+        margin-right: 4px !important;
+    }
+}

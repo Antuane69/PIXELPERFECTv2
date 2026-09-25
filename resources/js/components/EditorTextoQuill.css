@@ -1,0 +1,115 @@
+.editor-texto-quill {
+    box-sizing: border-box;
+    min-width: 0;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+    background: var(--card);
+    color: var(--card-foreground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 8px color-mix(in oklch, var(--foreground) 5%, transparent);
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.editor-texto-quill .ql-toolbar.ql-snow {
+    min-height: 42px;
+    background: color-mix(in oklch, var(--primary) 6%, var(--card));
+    border: 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.editor-texto-quill .ql-toolbar.ql-snow .ql-formats {
+    margin-right: 0.625rem;
+}
+
+.editor-texto-quill .ql-toolbar.ql-snow .ql-stroke {
+    stroke: var(--muted-foreground);
+}
+
+.editor-texto-quill .ql-toolbar.ql-snow .ql-fill {
+    fill: var(--muted-foreground);
+}
+
+.editor-texto-quill .ql-toolbar.ql-snow .ql-picker {
+    color: var(--foreground);
+}
+
+.editor-texto-quill .ql-toolbar.ql-snow button:hover .ql-stroke,
+.editor-texto-quill .ql-toolbar.ql-snow button.ql-active .ql-stroke {
+    stroke: var(--primary);
+}
+
+.editor-texto-quill .ql-toolbar.ql-snow button:hover .ql-fill,
+.editor-texto-quill .ql-toolbar.ql-snow button.ql-active .ql-fill {
+    fill: var(--primary);
+}
+
+.editor-texto-quill .ql-toolbar.ql-snow button:hover,
+.editor-texto-quill .ql-toolbar.ql-snow button:focus-visible,
+.editor-texto-quill .ql-toolbar.ql-snow button.ql-active {
+    color: var(--primary);
+    background: color-mix(in oklch, var(--primary) 10%, var(--card));
+}
+
+.editor-texto-quill .ql-snow .ql-picker.ql-expanded .ql-picker-label {
+    border-color: var(--ring);
+    color: var(--primary);
+}
+
+.editor-texto-quill .ql-snow .ql-picker-options {
+    border-color: var(--border);
+    border-radius: calc(var(--radius) - 0.25rem);
+    background: var(--popover);
+    box-shadow: 0 0.75rem 2rem
+        color-mix(in oklch, var(--foreground) 15%, transparent);
+    color: var(--popover-foreground);
+}
+
+.editor-texto-quill .ql-snow .ql-picker-item:hover,
+.editor-texto-quill .ql-snow .ql-picker-item.ql-selected {
+    color: var(--primary);
+}
+
+.editor-texto-quill .ql-container.ql-snow {
+    background: var(--card);
+    border: 0;
+    font-family: inherit;
+}
+
+.editor-texto-quill .ql-editor {
+    color: var(--card-foreground);
+    font-size: 0.875rem;
+    line-height: 1.55;
+}
+
+.editor-texto-quill .ql-editor.ql-blank::before {
+    color: var(--muted-foreground);
+    font-style: normal;
+}
+
+.editor-texto-quill .ql-snow .ql-tooltip {
+    border-color: var(--border);
+    border-radius: calc(var(--radius) - 0.25rem);
+    background: var(--popover);
+    box-shadow: 0 0.75rem 2rem
+        color-mix(in oklch, var(--foreground) 15%, transparent);
+    color: var(--popover-foreground);
+}
+
+.editor-texto-quill .ql-snow .ql-tooltip input[type='text'] {
+    border-color: var(--input);
+    border-radius: calc(var(--radius) - 0.25rem);
+    background: var(--background);
+    color: var(--foreground);
+}
+
+.editor-texto-quill .ql-snow .ql-tooltip a {
+    color: var(--primary);
+}
+
+.editor-texto-quill:focus-within {
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent);
+}

@@ -57,7 +57,10 @@ class AuthorizationTest extends TestCase
                 ->component('users/index')
                 ->where('auth.user.id', $administrator->id)
                 ->where('auth.user.roles', ['Administrador'])
-                ->has('auth.user.permissions', 21)
+                ->where('auth.user.permissions', fn (mixed $permissions): bool => collect($permissions)
+                    ->contains('users.view')
+                    && collect($permissions)->contains('users.assign_roles')
+                    && ! collect($permissions)->contains('logs.view'))
                 ->missing('auth.user.password')
                 ->missing('auth.user.two_factor_secret'),
             );
@@ -65,13 +68,28 @@ class AuthorizationTest extends TestCase
 
     public function test_roles_and_permissions_seeder_is_idempotent(): void
     {
-        $this->seed(RolesAndPermissionsSeeder::class);
-        $this->seed(RolesAndPermissionsSeeder::class);
-
         $administrator = Role::findByName('Administrador', 'web');
+        $permissionsBefore = Permission::query()
+            ->where('guard_name', 'web')
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
+        $rolePermissionsBefore = $administrator->permissions()
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
 
-        $this->assertSame(23, Permission::query()->where('guard_name', 'web')->count());
-        $this->assertSame(21, $administrator->permissions()->count());
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $this->assertSame(
+            $permissionsBefore,
+            Permission::query()->where('guard_name', 'web')->orderBy('name')->pluck('name')->all(),
+        );
+        $this->assertSame(
+            $rolePermissionsBefore,
+            $administrator->fresh()->permissions()->orderBy('name')->pluck('name')->all(),
+        );
     }
 
     public function test_dashboard_does_not_expose_counts_without_resource_permissions(): void

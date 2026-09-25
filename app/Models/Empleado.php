@@ -46,6 +46,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
     'fecha_inicio_contrato',
     'fecha_termino_contrato',
 ])]
+/** @property list<string>|null $dias_descanso */
 class Empleado extends Model
 {
     /** @use HasFactory<EmpleadoFactory> */

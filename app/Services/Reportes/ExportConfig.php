@@ -230,7 +230,7 @@ class ExportConfig
 
     public function getLogoContents(): ?string
     {
-        if ($this->logoContents !== null) {
+        if ($this->hasInlineLogo()) {
             return $this->logoContents;
         }
 
@@ -247,7 +247,7 @@ class ExportConfig
 
     public function getLogoMimeType(): ?string
     {
-        if ($this->logoMimeType !== null) {
+        if ($this->hasInlineLogo()) {
             return $this->logoMimeType;
         }
 
@@ -280,9 +280,17 @@ class ExportConfig
             return is_file($this->logoPath) ? $this->logoPath : null;
         }
 
-        return $this->logoContents === null
+        return ! $this->hasInlineLogo()
             ? (is_file(public_path(self::DEFAULT_LOGO_PATH)) ? public_path(self::DEFAULT_LOGO_PATH) : null)
             : null;
+    }
+
+    private function hasInlineLogo(): bool
+    {
+        return $this->logoContents !== null
+            && $this->logoContents !== ''
+            && $this->logoMimeType !== null
+            && $this->logoMimeType !== '';
     }
 
     public function getBrandName(): string

@@ -46,8 +46,20 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Application Structure & Architecture
 
-- Stick to existing directory structure; don't create new base folders without approval.
+- Stick to existing directory structure. Create module subfolders inside established layer roots as needed; create a new global root folder only when genuinely shared code needs it. Do not create unrelated project-level folders.
 - Do not change the application's dependencies without approval.
+
+## Module and Component Organization
+
+- Prefer small, reusable components and shared project patterns before building module-specific implementations from scratch. Inspect existing global components and analogous module hooks, services, models, requests, responses, policies, and actions first; extend a shared implementation backward-compatibly when its behavior is reusable.
+- Keep frontend pages in `resources/js/pages/<module>/` and module-only React code in `resources/js/features/<module>/`. Create only needed subfolders such as `components/`, `hooks/`, `services/`, `utils/`, and `types/`; do not create empty scaffolding. Use lowercase module folder names, for example `resources/js/features/horarios/`.
+- Put code that is shared across modules in the root of its global layer: `resources/js/components/`, `resources/js/hooks/`, `resources/js/services/`, `resources/js/utils/`, or the existing shared `resources/js/lib/` and `resources/js/types/` folders as appropriate. A new global layer such as `services/` or `utils/` may be added when genuinely shared code needs it. Do not place global code inside one module's feature folder.
+- Follow the same logical frontend layout and shared interaction patterns for every module. Reuse global UI primitives, form utilities, filters, tables, pagination, dialogs, drawers, loaders, and permission-aware navigation before adding feature-local equivalents.
+- Organize backend code by Laravel layer first, then module. Put module-specific classes in matching subfolders, for example `app/Http/Controllers/Horarios/`, `app/Http/Requests/Horarios/`, `app/Http/Responses/Horarios/`, `app/Models/Horarios/`, `app/Policies/Horarios/`, `app/Actions/Horarios/`, and `app/Services/Horarios/`. Add only layers the module needs; do not create a parallel top-level `app/Horarios/` structure.
+- Put backend code intended for reuse across modules in the root of its existing layer, such as `app/Services/`, `app/Actions/`, or `app/Http/Responses/`. Add a new shared layer only when cross-module reuse justifies it. Match PHP namespaces and class names to directory paths and use Laravel generators where applicable.
+- Keep Inertia pages under `resources/js/pages/<module>/`; keep Blade views, when required, under `resources/views/<module>/`. Keep module tests under `tests/Feature/<Module>/`. Preserve Laravel's canonical locations and loading conventions for routes, migrations, factories, and seeders rather than inventing parallel registries.
+- Apply the same module structure and domain access rules consistently: named routes, server-side authorization, tenant scoping, seeded permissions, module entitlement, shared list/filter/export behavior, and matching loading, empty, error, and permission states. Navigation visibility never replaces backend authorization.
+- When extending an existing module, follow this organization for new code and reuse existing patterns. Do not move large sets of existing files solely for cosmetic consistency unless that migration is part of the requested scope.
 
 ## New Module Standard
 

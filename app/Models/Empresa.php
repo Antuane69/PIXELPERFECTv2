@@ -137,6 +137,22 @@ class Empresa extends Model
     }
 
     /**
+     * @return HasMany<EmpleadoCarpeta, $this>
+     */
+    public function empleadoCarpetas(): HasMany
+    {
+        return $this->hasMany(EmpleadoCarpeta::class);
+    }
+
+    /**
+     * @return HasMany<EmpleadoDocumentoCatalogo, $this>
+     */
+    public function empleadoDocumentosCatalogo(): HasMany
+    {
+        return $this->hasMany(EmpleadoDocumentoCatalogo::class, 'empresa_id');
+    }
+
+    /**
      * @return HasMany<Empleado, $this>
      */
     public function empleados(): HasMany

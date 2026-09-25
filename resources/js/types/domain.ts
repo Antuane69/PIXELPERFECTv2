@@ -51,6 +51,32 @@ export type Puesto = {
     deleted_at?: string | null;
 };
 
+export type EmpleadoCarpeta = {
+    id: number;
+    nombre: string;
+    creado_por_id: number;
+    creado_por: Pick<ManagedUser, 'id' | 'name'> | null;
+    usuarios_con_acceso: Array<Pick<ManagedUser, 'id' | 'name'>>;
+    deleted_at?: string | null;
+};
+
+export type EmpleadoDocumentoCatalogo = {
+    id: number;
+    nombre: string;
+    empleado_carpeta_id: number;
+    contenido_html?: string;
+    modulo_ids?: number[];
+    modulos?: Pick<Modulo, 'id' | 'clave' | 'nombre'>[];
+    carpeta_nombre: string | null;
+    updated_at: string | null;
+    deleted_at: string | null;
+};
+
+export type EmpleadoDocumentoCatalogoVariable = {
+    key: string;
+    label: string;
+};
+
 export type TipoDocumentoEmpleado = {
     id: number;
     nombre: string;

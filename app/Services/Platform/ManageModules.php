@@ -40,6 +40,12 @@ class ManageModules
                 ]);
             }
 
+            if ($module->documentosCatalogo()->exists()) {
+                throw ValidationException::withMessages([
+                    'modulo' => 'No puedes eliminar módulo relacionado con documentos. Desvincúlalo primero.',
+                ]);
+            }
+
             $module->delete();
         });
     }
