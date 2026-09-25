@@ -64,6 +64,7 @@ class EmpleadoDocumentoCatalogo extends Model
             ->whereIn('empleado_carpeta_id', EmpleadoCarpeta::query()
                 ->select('id')
                 ->whereBelongsTo($empresa)
+                ->where('activo', true)
                 ->visiblesPara($user));
     }
 

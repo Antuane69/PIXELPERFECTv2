@@ -29,7 +29,7 @@ type GetRoute = {
 };
 
 export type FilterValue = string | number | boolean;
-type QueryValue = FilterValue | FilterValue[];
+export type FilterQueryValue = FilterValue | FilterValue[];
 type FilterSelections = Record<string, string[]>;
 
 export type FilterFacetOption = {
@@ -61,7 +61,7 @@ type FiltrosBaseProps = {
     route: GetRoute;
     defaultSearch?: string;
     placeholder?: string;
-    query?: Record<string, QueryValue | null | undefined>;
+    query?: Record<string, FilterQueryValue | null | undefined>;
     facets?: FilterFacet[];
     showSearch?: boolean;
     showDates?: boolean;
@@ -69,6 +69,7 @@ type FiltrosBaseProps = {
     loading?: boolean;
     title?: string;
     description?: string;
+    onApply?: (query: Record<string, FilterQueryValue>) => void | Promise<void>;
     children?: ReactNode;
 };
 
@@ -85,7 +86,7 @@ function valueKey(value: FilterValue): string {
 
 function valuesFrom(
     facet: FilterFacet,
-    value: QueryValue | null | undefined,
+    value: FilterQueryValue | null | undefined,
 ): string[] {
     const source = value ?? facet.defaultValue;
 
@@ -177,6 +178,7 @@ export function FiltrosBase({
     loading = false,
     title = 'Filtros',
     description = 'Combina criterios para encontrar registros con precisión.',
+    onApply,
     children,
 }: FiltrosBaseProps) {
     const isMobile = useIsMobile();
@@ -282,8 +284,8 @@ export function FiltrosBase({
         nextSelections: FilterSelections,
         nextStartDate: string,
         nextEndDate: string,
-    ): Record<string, QueryValue> => {
-        const payload: Record<string, QueryValue> = {};
+    ): Record<string, FilterQueryValue> => {
+        const payload: Record<string, FilterQueryValue> = {};
         const managedKeys = new Set([
             'search',
             'page',
@@ -342,17 +344,30 @@ export function FiltrosBase({
         nextStartDate = startDate,
         nextEndDate = endDate,
     ) => {
-        setProcessing(true);
-        router.get(
-            route.url,
-            buildQuery(nextSearch, nextSelections, nextStartDate, nextEndDate),
-            {
-                preserveScroll: true,
-                preserveState: true,
-                replace: true,
-                onFinish: () => setProcessing(false),
-            },
+        const payload = buildQuery(
+            nextSearch,
+            nextSelections,
+            nextStartDate,
+            nextEndDate,
         );
+
+        if (onApply) {
+            setProcessing(true);
+
+            void Promise.resolve(onApply(payload))
+                .catch(() => undefined)
+                .finally(() => setProcessing(false));
+
+            return;
+        }
+
+        setProcessing(true);
+        router.get(route.url, payload, {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+            onFinish: () => setProcessing(false),
+        });
     };
 
     const submitSearch = (event: FormEvent<HTMLFormElement>) => {

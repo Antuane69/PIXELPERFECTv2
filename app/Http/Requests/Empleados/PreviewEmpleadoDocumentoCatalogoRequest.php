@@ -13,30 +13,44 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
-class StoreEmpleadoDocumentoCatalogoRequest extends FormRequest
+class PreviewEmpleadoDocumentoCatalogoRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('empleados_documentos_catalogo.create') ?? false;
+        $user = $this->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        return $this->filled('documento_id')
+            ? $user->can('empleados_documentos_catalogo.update')
+            : $user->can('empleados_documentos_catalogo.create');
     }
 
     /** @return array<string, ValidationRule|array<mixed>|string> */
     public function rules(): array
     {
         $empresa = app(EmpresaContext::class)->empresaRequerida();
-        $empresaId = $empresa->id;
         $user = $this->user();
         $availableModuleIds = $user instanceof User
             ? app(ModulosRelacionablesDocumentoCatalogo::class)->query($user, $empresa)->pluck('modulos.id')->all()
             : [];
 
         return [
+            'documento_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('empleados_documentos_catalogo', 'id')
+                    ->where('empresa_id', $empresa->id)
+                    ->whereNull('deleted_at'),
+            ],
             'nombre' => ['required', 'string', 'max:180'],
             'empleado_carpeta_id' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('empleados_carpetas', 'id')
-                    ->where('empresa_id', $empresaId)
+                    ->where('empresa_id', $empresa->id)
                     ->where('activo', true)
                     ->whereNull('deleted_at'),
             ],
@@ -63,23 +77,23 @@ class StoreEmpleadoDocumentoCatalogoRequest extends FormRequest
         }];
     }
 
-    /** @return array{nombre: string, empleado_carpeta_id: int, contenido_html: string, modulo_ids: list<int>} */
-    public function documentoData(): array
+    /** @return array{documento_id: int|null, nombre: string, empleado_carpeta_id: int|null, modulo_ids: list<int>, contenido_html: string} */
+    public function previewData(): array
     {
         $data = $this->validated();
 
         return [
+            'documento_id' => isset($data['documento_id']) ? (int) $data['documento_id'] : null,
             'nombre' => (string) $data['nombre'],
-            'empleado_carpeta_id' => (int) $data['empleado_carpeta_id'],
-            'contenido_html' => (string) $data['contenido_html'],
+            'empleado_carpeta_id' => isset($data['empleado_carpeta_id']) ? (int) $data['empleado_carpeta_id'] : null,
             'modulo_ids' => array_values(array_map('intval', $data['modulo_ids'])),
+            'contenido_html' => (string) $data['contenido_html'],
         ];
     }
 
     protected function prepareForValidation(): void
     {
         $nombre = $this->input('nombre');
-
         $normalized = [];
 
         if (is_string($nombre)) {
@@ -97,7 +111,7 @@ class StoreEmpleadoDocumentoCatalogoRequest extends FormRequest
 
     private function validateFolderAccess(Validator $validator): void
     {
-        if ($validator->errors()->has('empleado_carpeta_id')) {
+        if ($validator->errors()->has('empleado_carpeta_id') || ! $this->filled('empleado_carpeta_id')) {
             return;
         }
 

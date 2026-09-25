@@ -55,6 +55,20 @@ export function CarpetaFormDialog({
                         <InputError message={errors.nombre} />
                     </div>
 
+                    <div className="flex items-center gap-3 rounded-lg border p-4">
+                        <input type="hidden" name="activo" value="0" />
+                        <Checkbox
+                            id="empleado-carpeta-activo"
+                            name="activo"
+                            value="1"
+                            defaultChecked={carpeta?.activo ?? true}
+                        />
+                        <Label htmlFor="empleado-carpeta-activo">
+                            Carpeta activa
+                        </Label>
+                    </div>
+                    <InputError message={errors.activo} />
+
                     <input type="hidden" name="user_ids_present" value="1" />
                     <fieldset className="grid gap-2">
                         <legend className="text-sm leading-none font-medium">

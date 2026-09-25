@@ -24,6 +24,7 @@ type ResourceFormDialogProps = {
     formId: string;
     form: ResourceForm;
     children: (errors: Record<string, string>) => ReactNode;
+    footerActions?: ReactNode;
     submitLabel?: string;
     className?: string;
     resetOnSuccess?: boolean;
@@ -38,6 +39,7 @@ export function ResourceFormDialog({
     formId,
     form,
     children,
+    footerActions,
     submitLabel = 'Guardar',
     className,
     resetOnSuccess = false,
@@ -75,6 +77,7 @@ export function ResourceFormDialog({
                                 </p>
                             ) : null}
                             <DialogFooter>
+                                {footerActions}
                                 <Button
                                     type="button"
                                     variant="outline"

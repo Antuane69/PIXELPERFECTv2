@@ -15,13 +15,17 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-#[Fillable(['empresa_id', 'creado_por_id', 'nombre'])]
+#[Fillable(['empresa_id', 'creado_por_id', 'nombre', 'activo'])]
 class EmpleadoCarpeta extends Model
 {
     /** @use HasFactory<EmpleadoCarpetaFactory> */
     use HasFactory, LogsActivity, SoftDeletes;
 
     protected $table = 'empleados_carpetas';
+
+    protected $attributes = [
+        'activo' => true,
+    ];
 
     /**
      * @return BelongsTo<Empresa, $this>
@@ -76,7 +80,7 @@ class EmpleadoCarpeta extends Model
     {
         return LogOptions::defaults()
             ->useLogName('empleados_carpetas')
-            ->logOnly(['empresa_id', 'creado_por_id', 'nombre'])
+            ->logOnly(['empresa_id', 'creado_por_id', 'nombre', 'activo'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }
@@ -92,6 +96,7 @@ class EmpleadoCarpeta extends Model
     protected function casts(): array
     {
         return [
+            'activo' => 'boolean',
             'deleted_at' => 'datetime',
         ];
     }

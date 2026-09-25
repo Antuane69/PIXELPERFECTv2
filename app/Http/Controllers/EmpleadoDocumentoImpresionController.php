@@ -33,6 +33,7 @@ class EmpleadoDocumentoImpresionController extends Controller
         $selectedFolder = $requestedFolderId > 0
             ? EmpleadoCarpeta::query()
                 ->whereBelongsTo($empresa)
+                ->where('activo', true)
                 ->visiblesPara($usuario)
                 ->find($requestedFolderId)
             : null;
@@ -42,6 +43,7 @@ class EmpleadoDocumentoImpresionController extends Controller
         $perPage = min(max($request->integer('per_page', 25), 1), 100);
         $carpetas = EmpleadoCarpeta::query()
             ->whereBelongsTo($empresa)
+            ->where('activo', true)
             ->visiblesPara($usuario)
             ->whereHas('documentosCatalogo', fn (Builder $query): Builder => $query
                 ->where('empresa_id', $empresa->id))

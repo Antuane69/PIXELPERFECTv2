@@ -2,6 +2,7 @@ export type PaginationLink = {
     url: string | null;
     label: string;
     active: boolean;
+    page?: number | null;
 };
 
 export type LaravelPaginator<T> = {
@@ -54,6 +55,7 @@ export type Puesto = {
 export type EmpleadoCarpeta = {
     id: number;
     nombre: string;
+    activo: boolean;
     creado_por_id: number;
     creado_por: Pick<ManagedUser, 'id' | 'name'> | null;
     usuarios_con_acceso: Array<Pick<ManagedUser, 'id' | 'name'>>;

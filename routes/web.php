@@ -100,6 +100,14 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
                         'empleados/catalogos/documentos/{empleadoDocumentoCatalogo}',
                         [EmpleadoDocumentoCatalogoController::class, 'show'],
                     )->name('empleados.documentos-catalogo.show');
+                    Route::post(
+                        'empleados/catalogos/documentos/previsualizar',
+                        [EmpleadoDocumentoCatalogoController::class, 'preview'],
+                    )->name('empleados.documentos-catalogo.preview');
+                    Route::post(
+                        'empleados/catalogos/documentos/consultar',
+                        [EmpleadoDocumentoCatalogoController::class, 'listDocuments'],
+                    )->name('empleados.documentos-catalogo.list');
                     Route::get(
                         'empleados/catalogos/documentos',
                         [EmpleadoDocumentoCatalogoController::class, 'index'],

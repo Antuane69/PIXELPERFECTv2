@@ -41,6 +41,7 @@ class UpdateEmpleadoDocumentoCatalogoRequest extends FormRequest
                 'integer',
                 Rule::exists('empleados_carpetas', 'id')
                     ->where('empresa_id', $empresaId)
+                    ->where('activo', true)
                     ->whereNull('deleted_at'),
             ],
             'modulo_ids' => ['present', 'array'],
@@ -113,6 +114,7 @@ class UpdateEmpleadoDocumentoCatalogoRequest extends FormRequest
 
         $canAccess = EmpleadoCarpeta::query()
             ->whereBelongsTo($empresa)
+            ->where('activo', true)
             ->visiblesPara($user)
             ->whereKey((int) $this->input('empleado_carpeta_id'))
             ->exists();

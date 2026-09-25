@@ -40,6 +40,13 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
 - Check for existing components to reuse before writing a new one.
 
+## Visible URL Contract
+
+- Never put query parameters in a user-visible URL unless the user explicitly requests that exact URL behavior and the flow visually removes those parameters afterward.
+- This rule applies across every page and flow, including search, filters, archived state, pagination, tabs, and CRUD return context.
+- Keep transient workflow state in client state, request bodies, or server-side session state. Do not add query parameters to links, redirects, or browser history for these flows.
+- If an explicitly requested flow temporarily needs URL parameters, clean the visible URL before the user continues in that flow.
+
 ## Verification Scripts
 
 - Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
@@ -165,22 +172,24 @@ Unknown business rules must be marked as `No verificable` and confirmed before p
 
 ### Table, Search, Filter, and Pagination Requirements
 
+**Clean URL rule:** Never put search terms, filters, archived state, page size, page number, or other workflow state in the browser's visible URL unless the user explicitly requests that exact URL behavior and the flow visually removes those parameters afterward. Keep listing state in client state and submit it through request bodies or another server-side mechanism that leaves the visible URL clean. Do not preserve listing context by appending query parameters to redirects or pagination links. This rule overrides any lower-level convention that says to keep listing state in the URL.
+
 Every index table must:
 
 - select only required columns, eager-load displayed relationships, avoid N+1 queries, and use deterministic ordering;
 - normalize search text and explicitly define searchable columns;
-- validate or safely coerce every filter accepted from the URL;
+- validate or safely coerce every filter accepted from a request body or other non-URL state;
 - use a bounded page size, normally `min(max($request->integer('per_page', 15), 1), 100)`;
-- use `paginate($perPage)->withQueryString()` and return a typed Laravel paginator;
+- use bounded pagination and return a typed Laravel paginator without adding listing state to URLs;
 - return normalized `filters` props matching frontend TypeScript names and nullability;
-- keep search, filters, archived state, `per_page`, and `page` in the URL;
-- preserve allowed listing context after successful create, update, delete, and restore through `Controller::redirectToResourceIndex()` plus a per-controller allowlist;
+- keep search, filters, archived state, `per_page`, and `page` out of the visible URL;
+- preserve listing context in client or server-side request state after successful mutations, never through query parameters;
 - expose every user-facing backend filter through a labeled UI control. A backend-only filter is allowed only when intentionally reserved and documented;
 - include a clear-filter action and show an appropriate empty state for filtered and archived results;
 - use `ResourceTable` and `ResourcePagination` unless the module has a documented incompatible requirement;
 - provide an accessible mobile alternative, accessible names for icon-only actions and pagination controls, visible focus, and feedback not based only on color.
 
-Pagination is not considered verified by checking `per_page` alone. Tests must create enough records for multiple pages, navigate to another page, and assert that active search/filter query parameters remain in paginator links and responses.
+Pagination is not considered verified by checking `per_page` alone. Tests must create enough records for multiple pages, navigate to another page, and assert that active search/filter state remains in the request and response while browser URLs stay clean.
 
 ### Inertia React Requirements
 

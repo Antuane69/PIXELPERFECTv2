@@ -77,6 +77,7 @@ class EmpleadoDocumentoCatalogoPolicy
     {
         return $user->can('empleados_documentos_catalogo.create')
             && $this->folderIsInActiveCompany($carpeta)
+            && $carpeta->activo
             && $this->userCanAccessFolder($user, $carpeta);
     }
 
@@ -84,6 +85,7 @@ class EmpleadoDocumentoCatalogoPolicy
     {
         return $user->can('empleados_documentos_catalogo.update')
             && $this->folderIsInActiveCompany($carpeta)
+            && $carpeta->activo
             && $this->userCanAccessFolder($user, $carpeta);
     }
 
@@ -96,6 +98,7 @@ class EmpleadoDocumentoCatalogoPolicy
         return $carpeta instanceof EmpleadoCarpeta
             && $carpeta->empresa_id === $documento->empresa_id
             && $this->folderIsInActiveCompany($carpeta)
+            && $carpeta->activo
             && $this->userCanAccessFolder($user, $carpeta);
     }
 

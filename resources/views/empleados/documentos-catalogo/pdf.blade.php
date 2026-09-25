@@ -23,20 +23,18 @@
             border: 1px solid #e6d8ec;
             border-radius: 7px;
             border-top: 3px solid #935aac;
-            bottom: 6mm;
-            left: 6mm;
+            bottom: -12mm;
+            left: -11mm;
             position: fixed;
-            right: 6mm;
-            top: 6mm;
+            right: -11mm;
+            top: -14mm;
         }
 
         .document-header {
-            border-bottom: 1px solid #e6d8ec;
             left: 0;
-            padding-bottom: 7px;
             position: fixed;
             right: 0;
-            top: -20mm;
+            top: -11mm;
         }
 
         .document-header-table,
@@ -52,59 +50,31 @@
             vertical-align: middle;
         }
 
-        .document-brand-mark {
-            background-color: #935aac;
-            border-radius: 5px;
-            color: #ffffff;
-            display: inline-block;
-            font-size: 8pt;
-            font-weight: bold;
-            height: 27px;
-            line-height: 27px;
-            text-align: center;
-            width: 27px;
-        }
-
-        .document-brand-copy {
-            padding-left: 8px !important;
-        }
-
-        .document-brand-copy strong,
-        .document-brand-copy span,
-        .document-title-block span,
-        .document-title-block strong {
-            display: block;
-        }
-
-        .document-brand-copy strong {
+        .document-company-name {
             color: #271b2c;
-            font-size: 8pt;
-            letter-spacing: 0.5px;
-        }
-
-        .document-brand-copy span {
-            color: #6f5978;
-            font-size: 7pt;
-            margin-top: 2px;
+            font-size: 8.5pt;
+            font-weight: bold;
+            word-wrap: break-word;
         }
 
         .document-title-block {
             text-align: right;
-            width: 48%;
+            width: 58%;
         }
 
         .document-title-block .document-eyebrow {
             color: #935aac;
             font-size: 6.5pt;
             font-weight: bold;
-            letter-spacing: 1px;
-            margin-bottom: 3px;
+            letter-spacing: 0.5px;
+            margin-right: 4px;
             text-transform: uppercase;
         }
 
         .document-title-block .document-name {
-            color: #6f5978;
+            color: #271b2c;
             font-size: 8pt;
+            font-weight: bold;
             word-wrap: break-word;
         }
 
@@ -223,14 +193,13 @@
         }
 
         .document-footer {
-            border-top: 1px solid #e6d8ec;
-            bottom: -16mm;
+            bottom: -8mm;
             color: #6f5978;
             font-size: 7pt;
             left: 0;
-            padding-top: 6px;
             position: fixed;
             right: 0;
+            text-align: right;
         }
 
         .document-page-number {
@@ -251,15 +220,9 @@
         <table class="document-header-table">
             <tbody>
                 <tr>
-                    <td style="width: 30px">
-                        <span class="document-brand-mark">PP</span>
-                    </td>
-                    <td class="document-brand-copy">
-                        <strong>PIXEL PERFECT</strong>
-                        <span>Gestión empresarial</span>
-                    </td>
+                    <td class="document-company-name">{{ $nombreEmpresa }}</td>
                     <td class="document-title-block">
-                        <span class="document-eyebrow">Documento digital</span>
+                        <span class="document-eyebrow">Documento digital:</span>
                         <strong class="document-name">{{ $nombreDocumento }}</strong>
                     </td>
                 </tr>
@@ -272,14 +235,7 @@
     </main>
 
     <footer class="document-footer">
-        <table class="document-footer-table">
-            <tbody>
-                <tr>
-                    <td>Documento generado con Pixel Perfect</td>
-                    <td class="document-page-number">Página </td>
-                </tr>
-            </tbody>
-        </table>
+        <span class="document-page-number">Página </span>
     </footer>
 </body>
 </html>

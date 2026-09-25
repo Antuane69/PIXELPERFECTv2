@@ -7,6 +7,17 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarMenu,
@@ -15,9 +26,18 @@ import {
     SidebarMenuSub,
     SidebarMenuSubButton,
     SidebarMenuSubItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
+
+const rootNavButtonClassName =
+    'h-auto min-h-8 overflow-visible! [&>span:last-child]:flex-1 [&>span:last-child]:overflow-visible! [&>span:last-child]:text-clip! [&>span:last-child]:whitespace-normal!';
+const nestedNavButtonClassName =
+    'h-auto min-h-7 w-full overflow-visible! [&>span:last-child]:flex-1 [&>span:last-child]:overflow-visible! [&>span:last-child]:text-clip! [&>span:last-child]:whitespace-normal!';
+const navLabelClassName =
+    'min-w-0 flex-1 break-words whitespace-normal group-data-[collapsible=icon]:hidden';
+const nestedNavLabelClassName = 'min-w-0 flex-1 break-words whitespace-normal';
 
 export function NavMain({ items = [] }: { items: NavItem[] }) {
     return (
@@ -34,6 +54,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
 
 function NavEntry({ item, depth }: { item: NavItem; depth: number }) {
     const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
+    const { state: sidebarState, isMobile } = useSidebar();
     const hasActiveRoute = (entry: NavItem): boolean =>
         (entry.href ? isCurrentOrParentUrl(entry.href) : false) ||
         (entry.children?.some(hasActiveRoute) ?? false);
@@ -52,6 +73,42 @@ function NavEntry({ item, depth }: { item: NavItem; depth: number }) {
     };
 
     if (item.children?.length) {
+        if (depth === 0 && sidebarState === 'collapsed' && !isMobile) {
+            return (
+                <SidebarMenuItem>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <SidebarMenuButton
+                                isActive={branchActive}
+                                tooltip={{ children: item.title }}
+                                aria-label={item.title}
+                                className={rootNavButtonClassName}
+                            >
+                                {item.icon && <item.icon />}
+                                <span className={navLabelClassName}>
+                                    {item.title}
+                                </span>
+                            </SidebarMenuButton>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                            side="right"
+                            align="start"
+                            className="max-h-[calc(100vh-2rem)] w-56 overflow-y-auto"
+                        >
+                            <DropdownMenuLabel>{item.title}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {item.children.map((child) => (
+                                <NavFlyoutEntry
+                                    key={child.title}
+                                    item={child}
+                                />
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </SidebarMenuItem>
+            );
+        }
+
         const contents = (
             <>
                 <CollapsibleTrigger asChild>
@@ -60,16 +117,25 @@ function NavEntry({ item, depth }: { item: NavItem; depth: number }) {
                             isActive={branchActive}
                             tooltip={{ children: item.title }}
                             aria-expanded={open}
+                            className={rootNavButtonClassName}
                         >
                             {item.icon && <item.icon />}
-                            <span>{item.title}</span>
+                            <span className={navLabelClassName}>
+                                {item.title}
+                            </span>
                             <ChevronDown className="ml-auto transition-transform data-[state=open]:rotate-180" />
                         </SidebarMenuButton>
                     ) : (
-                        <SidebarMenuSubButton asChild isActive={branchActive}>
+                        <SidebarMenuSubButton
+                            asChild
+                            isActive={branchActive}
+                            className={nestedNavButtonClassName}
+                        >
                             <button type="button" aria-expanded={open}>
                                 {item.icon && <item.icon />}
-                                <span>{item.title}</span>
+                                <span className={nestedNavLabelClassName}>
+                                    {item.title}
+                                </span>
                                 <ChevronDown className="ml-auto transition-transform data-[state=open]:rotate-180" />
                             </button>
                         </SidebarMenuSubButton>
@@ -110,21 +176,66 @@ function NavEntry({ item, depth }: { item: NavItem; depth: number }) {
                 asChild
                 isActive={active}
                 tooltip={{ children: item.title }}
+                className={rootNavButtonClassName}
             >
                 <Link href={item.href} prefetch>
                     {item.icon && <item.icon />}
-                    <span>{item.title}</span>
+                    <span className={navLabelClassName}>{item.title}</span>
                 </Link>
             </SidebarMenuButton>
         </SidebarMenuItem>
     ) : (
         <SidebarMenuSubItem>
-            <SidebarMenuSubButton asChild isActive={active}>
+            <SidebarMenuSubButton
+                asChild
+                isActive={active}
+                className={nestedNavButtonClassName}
+            >
                 <Link href={item.href} prefetch>
                     {item.icon && <item.icon />}
-                    <span>{item.title}</span>
+                    <span className={nestedNavLabelClassName}>
+                        {item.title}
+                    </span>
                 </Link>
             </SidebarMenuSubButton>
         </SidebarMenuSubItem>
+    );
+}
+
+function NavFlyoutEntry({ item }: { item: NavItem }) {
+    const { isCurrentUrl } = useCurrentUrl();
+
+    if (item.children?.length) {
+        return (
+            <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="gap-2 [&>svg]:size-4">
+                    {item.icon && <item.icon />}
+                    <span>{item.title}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                    {item.children.map((child) => (
+                        <NavFlyoutEntry key={child.title} item={child} />
+                    ))}
+                </DropdownMenuSubContent>
+            </DropdownMenuSub>
+        );
+    }
+
+    if (!item.href) {
+        return null;
+    }
+
+    const active = isCurrentUrl(item.href);
+
+    return (
+        <DropdownMenuItem
+            asChild
+            className={active ? 'bg-accent text-accent-foreground' : undefined}
+        >
+            <Link href={item.href} prefetch>
+                {item.icon && <item.icon />}
+                <span>{item.title}</span>
+            </Link>
+        </DropdownMenuItem>
     );
 }

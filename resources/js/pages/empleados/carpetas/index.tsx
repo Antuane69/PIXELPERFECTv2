@@ -33,6 +33,7 @@ type Props = {
     usuarios: EmpresaUserOption[];
     filters: {
         search: string;
+        activo: boolean | null;
         archivados: boolean;
         perPage: number;
     };
@@ -56,6 +57,14 @@ export default function EmpleadoCarpetasIndex({
     }
 
     const filterFacets: FilterFacet[] = [
+        {
+            key: 'activo',
+            label: 'Estado de la carpeta',
+            options: [
+                { value: true, label: 'Activo' },
+                { value: false, label: 'Inactivo' },
+            ],
+        },
         {
             key: 'archivados',
             label: 'Tipo de registro',
@@ -102,9 +111,21 @@ export default function EmpleadoCarpetasIndex({
         {
             key: 'estado',
             header: 'Estado',
-            cell: () => (
-                <Badge variant={showingArchived ? 'outline' : 'default'}>
-                    {showingArchived ? 'Archivada' : 'Vigente'}
+            cell: (carpeta) => (
+                <Badge
+                    variant={
+                        showingArchived
+                            ? 'outline'
+                            : carpeta.activo
+                              ? 'default'
+                              : 'secondary'
+                    }
+                >
+                    {showingArchived
+                        ? 'Archivada'
+                        : carpeta.activo
+                          ? 'Activa'
+                          : 'Inactiva'}
                 </Badge>
             ),
         },
@@ -185,6 +206,7 @@ export default function EmpleadoCarpetasIndex({
                     placeholder="Buscar carpeta"
                     facets={filterFacets}
                     query={{
+                        activo: filters.activo,
                         archivados: showingArchived,
                         per_page: filters.perPage,
                     }}

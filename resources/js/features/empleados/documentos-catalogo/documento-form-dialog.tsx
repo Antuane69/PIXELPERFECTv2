@@ -1,6 +1,7 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Eye } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
+    preview,
     store,
     update,
 } from '@/actions/App/Http/Controllers/EmpleadoDocumentoCatalogoController';
@@ -24,6 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import type {
     EmpleadoDocumentoCatalogo,
     EmpleadoDocumentoCatalogoVariable,
@@ -39,7 +41,7 @@ type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     documento: EmpleadoDocumentoCatalogo | null;
-    carpetaIdInicial: number;
+    carpetaIdInicial: number | null;
     carpetas: FolderOption[];
     modulosDisponibles: Pick<Modulo, 'id' | 'clave' | 'nombre'>[];
     variables: EmpleadoDocumentoCatalogoVariable[];
@@ -54,10 +56,14 @@ export function DocumentoFormDialog({
     modulosDisponibles,
     variables,
 }: Props) {
+    const [nombre, setNombre] = useState(documento?.nombre ?? '');
     const [contenido, setContenido] = useState(documento?.contenido_html ?? '');
-    const [carpetaId, setCarpetaId] = useState(
-        String(documento?.empleado_carpeta_id ?? carpetaIdInicial),
-    );
+    const [carpetaId, setCarpetaId] = useState(() => {
+        const initialFolderId =
+            documento?.empleado_carpeta_id ?? carpetaIdInicial;
+
+        return initialFolderId === null ? '' : String(initialFolderId);
+    });
     const [moduloIds, setModuloIds] = useState<number[]>(() => {
         const modulosDisponiblesIds = new Set(
             modulosDisponibles.map((modulo) => modulo.id),
@@ -68,9 +74,94 @@ export function DocumentoFormDialog({
         );
     });
     const [editorReady, setEditorReady] = useState(false);
+    const [previewing, setPreviewing] = useState(false);
+    const [previewError, setPreviewError] = useState<string | null>(null);
     const editorElementRef = useRef<HTMLTextAreaElement | null>(null);
     const editorInstanceRef = useRef<CKEditorInstance | null>(null);
     const formId = 'empleado-documento-catalogo-form';
+
+    const previewPdf = async (): Promise<void> => {
+        setPreviewError(null);
+
+        const previewWindow = window.open('', '_blank');
+
+        if (!previewWindow) {
+            setPreviewError(
+                'Permite ventanas emergentes para abrir la vista previa.',
+            );
+
+            return;
+        }
+
+        previewWindow.opener = null;
+        previewWindow.document.body.textContent = 'Generando vista previa…';
+        setPreviewing(true);
+
+        try {
+            const formData = new FormData();
+            const csrfToken = document
+                .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+                ?.getAttribute('content');
+
+            if (csrfToken) {
+                formData.append('_token', csrfToken);
+            }
+
+            if (documento) {
+                formData.append('documento_id', String(documento.id));
+            }
+
+            formData.append('nombre', nombre);
+            formData.append('empleado_carpeta_id', carpetaId);
+            moduloIds.forEach((id) => {
+                formData.append('modulo_ids[]', String(id));
+            });
+            formData.append('contenido_html', contenido);
+
+            const response = await fetch(preview.url(), {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json, application/pdf',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData,
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                const responseBody = (await response
+                    .json()
+                    .catch(() => null)) as {
+                    errors?: Record<string, string[]>;
+                    message?: string;
+                } | null;
+                const validationMessage = Object.values(
+                    responseBody?.errors ?? {},
+                )
+                    .flat()
+                    .find((message) => typeof message === 'string');
+
+                throw new Error(
+                    validationMessage ??
+                        responseBody?.message ??
+                        'No se pudo generar la vista previa.',
+                );
+            }
+
+            const previewUrl = URL.createObjectURL(await response.blob());
+            previewWindow.location.replace(previewUrl);
+            window.setTimeout(() => URL.revokeObjectURL(previewUrl), 60_000);
+        } catch (error: unknown) {
+            previewWindow.close();
+            setPreviewError(
+                error instanceof Error
+                    ? error.message
+                    : 'No se pudo generar la vista previa.',
+            );
+        } finally {
+            setPreviewing(false);
+        }
+    };
 
     return (
         <ResourceFormDialog
@@ -81,6 +172,17 @@ export function DocumentoFormDialog({
             formId={formId}
             form={documento ? update.form(documento.id) : store.form()}
             className="sm:max-w-6xl"
+            footerActions={
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void previewPdf()}
+                    disabled={previewing}
+                >
+                    {previewing ? <Spinner /> : <Eye />}
+                    Previsualizar PDF
+                </Button>
+            }
         >
             {(errors) => {
                 const moduloError =
@@ -99,7 +201,10 @@ export function DocumentoFormDialog({
                                 <Input
                                     id="documento-catalogo-nombre"
                                     name="nombre"
-                                    defaultValue={documento?.nombre}
+                                    value={nombre}
+                                    onChange={(event) =>
+                                        setNombre(event.target.value)
+                                    }
                                     maxLength={180}
                                     required
                                     autoFocus
@@ -245,6 +350,14 @@ export function DocumentoFormDialog({
                                 value={contenido}
                             />
                             <InputError message={errors.contenido_html} />
+                            {previewError ? (
+                                <p
+                                    className="text-sm text-destructive"
+                                    role="alert"
+                                >
+                                    {previewError}
+                                </p>
+                            ) : null}
                         </div>
 
                         {moduloIds.length > 0 ? (

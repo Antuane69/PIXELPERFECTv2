@@ -20,6 +20,8 @@ class DownloadEmpleadoDocumentos
      */
     public function handle(Empleado $empleado, Collection $documentos): Response
     {
+        $documentos->loadMissing('empresa:id,nombre_comercial,nombre_legal');
+
         if ($documentos->count() === 1) {
             $documento = $documentos->firstOrFail();
             $pdf = $this->renderPdf->pdf($documento, $empleado);

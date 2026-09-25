@@ -26,6 +26,7 @@ class StoreEmpleadoCarpetaRequest extends FormRequest
 
         return [
             'nombre' => ['required', 'string', 'max:255'],
+            'activo' => ['sometimes', 'boolean'],
             'user_ids' => ['sometimes', 'array'],
             'user_ids.*' => [
                 'integer',
@@ -38,12 +39,13 @@ class StoreEmpleadoCarpetaRequest extends FormRequest
     }
 
     /**
-     * @return array{nombre: string, user_ids: array<mixed>}
+     * @return array{nombre: string, activo: bool, user_ids: array<mixed>}
      */
     public function carpetaData(): array
     {
         $data = $this->validated();
         $nombre = $data['nombre'] ?? null;
+        $activo = $data['activo'] ?? true;
         $userIds = $data['user_ids'] ?? [];
 
         if (! is_string($nombre) || ! is_array($userIds)) {
@@ -52,6 +54,7 @@ class StoreEmpleadoCarpetaRequest extends FormRequest
 
         return [
             'nombre' => $nombre,
+            'activo' => (bool) $activo,
             'user_ids' => $userIds,
         ];
     }
@@ -65,10 +68,23 @@ class StoreEmpleadoCarpetaRequest extends FormRequest
             $normalized['nombre'] = str($data['nombre'])->squish()->toString();
         }
 
+        if (array_key_exists('activo', $data)) {
+            $normalized['activo'] = $this->normalizedBoolean($data['activo']);
+        }
+
         if (array_key_exists('user_ids_present', $data) && ! array_key_exists('user_ids', $data)) {
             $normalized['user_ids'] = [];
         }
 
         $this->merge($normalized);
+    }
+
+    private function normalizedBoolean(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $value;
     }
 }

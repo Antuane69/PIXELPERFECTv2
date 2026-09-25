@@ -34,8 +34,11 @@ class RenderEmpleadoDocumentoPdf
 
     public function pdf(EmpleadoDocumentoCatalogo $documento, ?Empleado $empleado = null): string
     {
+        $documento->loadMissing('empresa:id,nombre_comercial,nombre_legal');
+
         return Pdf::loadView('empleados.documentos-catalogo.pdf', [
             'contenidoHtml' => $this->renderHtml($documento, $empleado),
+            'nombreEmpresa' => $documento->empresa?->stripeName() ?? '',
             'nombreDocumento' => $documento->nombre,
         ])
             ->setPaper('letter')

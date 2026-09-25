@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Actions\Empleados\RenderEmpleadoDocumentoPdf;
 use App\Actions\Empleados\SaveEmpleadoDocumentoCatalogo;
+use App\Http\Requests\Empleados\ListEmpleadoDocumentoCatalogoRequest;
+use App\Http\Requests\Empleados\PreviewEmpleadoDocumentoCatalogoRequest;
 use App\Http\Requests\Empleados\StoreEmpleadoDocumentoCatalogoRequest;
 use App\Http\Requests\Empleados\UpdateEmpleadoDocumentoCatalogoRequest;
 use App\Models\EmpleadoCarpeta;
@@ -18,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -26,7 +29,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmpleadoDocumentoCatalogoController extends Controller
 {
-    private const INDEX_QUERY_PARAMETERS = ['carpeta_id', 'search', 'archivados', 'per_page', 'page'];
+    private const LISTING_SESSION_KEY = 'documentos_catalogo.listing';
 
     public function __construct(private readonly EmpresaContext $empresaContext) {}
 
@@ -34,7 +37,11 @@ class EmpleadoDocumentoCatalogoController extends Controller
         Request $request,
         EmpleadoDocumentoVariables $variables,
         ModulosRelacionablesDocumentoCatalogo $modulosRelacionables,
-    ): Response {
+    ): Response|RedirectResponse {
+        if ($request->query->count() > 0) {
+            return to_route('empresas.empleados.documentos-catalogo.index');
+        }
+
         $empresa = $this->empresaContext->empresaRequerida();
         $usuario = $request->user();
         abort_unless($usuario instanceof User, 401);
@@ -57,6 +64,7 @@ class EmpleadoDocumentoCatalogoController extends Controller
         $carpetas = EmpleadoCarpeta::query()
             ->select(['id', 'empresa_id', 'nombre', 'creado_por_id'])
             ->whereBelongsTo($empresa)
+            ->where('activo', true)
             ->visiblesPara($usuario)
             ->withCount(['documentosCatalogo' => fn (Builder $query): Builder => $query
                 ->where('empresa_id', $empresa->id)])
@@ -71,19 +79,24 @@ class EmpleadoDocumentoCatalogoController extends Controller
             ->values()
             ->all();
 
-        $requestedFolderId = $request->integer('carpeta_id');
+        $listing = $request->session()->pull(self::LISTING_SESSION_KEY, []);
+        $requestedFolderId = is_array($listing) ? (int) ($listing['carpeta_id'] ?? 0) : 0;
         $selectedFolder = $requestedFolderId > 0
             ? EmpleadoCarpeta::query()
                 ->whereBelongsTo($empresa)
+                ->where('activo', true)
                 ->visiblesPara($usuario)
                 ->find($requestedFolderId)
             : null;
 
-        abort_if($requestedFolderId > 0 && $selectedFolder === null, 404);
+        if ($selectedFolder === null) {
+            $listing = [];
+        }
 
-        $search = $request->string('search')->squish()->toString();
-        $archivados = $request->boolean('archivados');
-        $perPage = min(max($request->integer('per_page', 15), 1), 100);
+        $search = is_string($listing['search'] ?? null) ? $listing['search'] : '';
+        $archivados = (bool) ($listing['archivados'] ?? false);
+        $perPage = min(max((int) ($listing['per_page'] ?? 15), 1), 100);
+        $page = max((int) ($listing['page'] ?? 1), 1);
 
         $documentos = EmpleadoDocumentoCatalogo::query()
             ->select(['id', 'empresa_id', 'empleado_carpeta_id', 'nombre', 'updated_at', 'deleted_at'])
@@ -106,8 +119,7 @@ class EmpleadoDocumentoCatalogoController extends Controller
             ->when($search !== '', fn (Builder $query): Builder => $query->where('nombre', 'like', "%{$search}%"))
             ->orderBy('nombre')
             ->orderBy('id')
-            ->paginate($perPage)
-            ->withQueryString()
+            ->paginate($perPage, ['*'], 'page', $page)
             ->through(static fn (EmpleadoDocumentoCatalogo $documento): array => [
                 'id' => $documento->id,
                 'nombre' => $documento->nombre,
@@ -125,6 +137,15 @@ class EmpleadoDocumentoCatalogoController extends Controller
                 'updated_at' => $documento->updated_at?->toISOString(),
                 'deleted_at' => $documento->deleted_at?->toISOString(),
             ]);
+        $documentosData = $documentos->toArray();
+        $documentosData['links'] = $this->paginationLinksWithoutUrls(
+            $documentosData['links'],
+            $documentos->currentPage(),
+            $documentos->lastPage(),
+        );
+        unset($documentosData['first_page_url'], $documentosData['last_page_url']);
+        $documentosData['next_page_url'] = null;
+        $documentosData['prev_page_url'] = null;
 
         return Inertia::render('empleados/documentos-catalogo/index', [
             'carpetas' => $carpetas,
@@ -132,7 +153,7 @@ class EmpleadoDocumentoCatalogoController extends Controller
                 'id' => $selectedFolder->id,
                 'nombre' => $selectedFolder->nombre,
             ],
-            'documentos' => $documentos,
+            'documentos' => $documentosData,
             'modulosDisponibles' => $modulosDisponibles,
             'variables' => collect($variables->definitions())
                 ->map(static fn (string $label, string $key): array => ['key' => $key, 'label' => $label])
@@ -145,6 +166,24 @@ class EmpleadoDocumentoCatalogoController extends Controller
                 'perPage' => $perPage,
             ],
         ]);
+    }
+
+    public function listDocuments(ListEmpleadoDocumentoCatalogoRequest $request): RedirectResponse
+    {
+        $empresa = $this->empresaContext->empresaRequerida();
+        $usuario = $request->user();
+        abort_unless($usuario instanceof User, 401);
+        $listing = $request->listingData();
+
+        EmpleadoCarpeta::query()
+            ->whereBelongsTo($empresa)
+            ->where('activo', true)
+            ->visiblesPara($usuario)
+            ->findOrFail($listing['carpeta_id']);
+
+        $request->session()->flash(self::LISTING_SESSION_KEY, $listing);
+
+        return to_route('empresas.empleados.documentos-catalogo.index');
     }
 
     public function show(
@@ -194,7 +233,7 @@ class EmpleadoDocumentoCatalogoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Documento creado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'empresas.empleados.documentos-catalogo.index', self::INDEX_QUERY_PARAMETERS);
+        return to_route('empresas.empleados.documentos-catalogo.index');
     }
 
     public function update(
@@ -213,10 +252,52 @@ class EmpleadoDocumentoCatalogoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Documento actualizado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'empresas.empleados.documentos-catalogo.index', self::INDEX_QUERY_PARAMETERS);
+        return to_route('empresas.empleados.documentos-catalogo.index');
     }
 
-    public function destroy(Request $request, EmpleadoDocumentoCatalogo $empleadoDocumentoCatalogo): RedirectResponse
+    public function preview(
+        PreviewEmpleadoDocumentoCatalogoRequest $request,
+        RenderEmpleadoDocumentoPdf $renderPdf,
+    ): HttpResponse {
+        $empresa = $this->empresaContext->empresaRequerida();
+        $data = $request->previewData();
+        $carpeta = $data['empleado_carpeta_id'] === null
+            ? null
+            : EmpleadoCarpeta::query()
+                ->whereBelongsTo($empresa)
+                ->findOrFail($data['empleado_carpeta_id']);
+
+        if ($data['documento_id'] !== null) {
+            $documentoExistente = EmpleadoDocumentoCatalogo::query()
+                ->whereBelongsTo($empresa)
+                ->findOrFail($data['documento_id']);
+
+            Gate::authorize('update', $documentoExistente);
+            if ($carpeta instanceof EmpleadoCarpeta) {
+                Gate::authorize('moveToFolder', [EmpleadoDocumentoCatalogo::class, $carpeta]);
+            }
+        } elseif ($carpeta instanceof EmpleadoCarpeta) {
+            Gate::authorize('createInFolder', [EmpleadoDocumentoCatalogo::class, $carpeta]);
+        } else {
+            Gate::authorize('create', EmpleadoDocumentoCatalogo::class);
+        }
+
+        $documento = new EmpleadoDocumentoCatalogo([
+            'empresa_id' => $empresa->id,
+            'empleado_carpeta_id' => $carpeta?->id,
+            'nombre' => $data['nombre'],
+            'contenido_html' => $data['contenido_html'],
+        ]);
+        $pdf = $renderPdf->pdf($documento);
+        $fileName = Str::slug($data['nombre']) ?: 'documento';
+
+        return response($pdf)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="'.$fileName.'-vista-previa.pdf"')
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function destroy(EmpleadoDocumentoCatalogo $empleadoDocumentoCatalogo): RedirectResponse
     {
         $this->assertActiveCompany($empleadoDocumentoCatalogo);
         Gate::authorize('delete', $empleadoDocumentoCatalogo);
@@ -224,10 +305,10 @@ class EmpleadoDocumentoCatalogoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Documento archivado correctamente.']);
 
-        return $this->redirectToResourceIndex($request, 'empresas.empleados.documentos-catalogo.index', self::INDEX_QUERY_PARAMETERS);
+        return to_route('empresas.empleados.documentos-catalogo.index');
     }
 
-    public function restore(Request $request, EmpleadoDocumentoCatalogo $empleadoDocumentoCatalogo): RedirectResponse
+    public function restore(EmpleadoDocumentoCatalogo $empleadoDocumentoCatalogo): RedirectResponse
     {
         $this->assertActiveCompany($empleadoDocumentoCatalogo);
         Gate::authorize('restore', $empleadoDocumentoCatalogo);
@@ -235,12 +316,7 @@ class EmpleadoDocumentoCatalogoController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Documento restaurado correctamente.']);
 
-        return $this->redirectToResourceIndex(
-            $request,
-            'empresas.empleados.documentos-catalogo.index',
-            self::INDEX_QUERY_PARAMETERS,
-            ['archivados' => true],
-        );
+        return to_route('empresas.empleados.documentos-catalogo.index');
     }
 
     public function download(
@@ -264,5 +340,37 @@ class EmpleadoDocumentoCatalogoController extends Controller
     private function assertActiveCompany(EmpleadoDocumentoCatalogo $documento): void
     {
         abort_unless($documento->empresa_id === $this->empresaContext->empresaRequerida()->id, 404);
+    }
+
+    /**
+     * @param  array<int, array{url: string|null, label: string, active: bool}>  $links
+     * @return array<int, array{url: null, label: string, active: bool, page: int|null}>
+     */
+    private function paginationLinksWithoutUrls(array $links, int $currentPage, int $lastPage): array
+    {
+        return array_map(static function (array $link) use ($currentPage, $lastPage): array {
+            $label = html_entity_decode($link['label'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $normalizedLabel = trim($label);
+            $page = null;
+
+            if (preg_match('/^\d+$/D', $normalizedLabel) === 1) {
+                $page = (int) $normalizedLabel;
+            } elseif (str_contains(strtolower($normalizedLabel), 'previous') || str_contains(strtolower($normalizedLabel), 'anterior')) {
+                $page = $currentPage - 1;
+            } elseif (str_contains(strtolower($normalizedLabel), 'next') || str_contains(strtolower($normalizedLabel), 'siguiente')) {
+                $page = $currentPage + 1;
+            }
+
+            if ($page !== null && ($page < 1 || $page > $lastPage)) {
+                $page = null;
+            }
+
+            return [
+                'url' => null,
+                'label' => $link['label'],
+                'active' => $link['active'],
+                'page' => $page,
+            ];
+        }, $links);
     }
 }

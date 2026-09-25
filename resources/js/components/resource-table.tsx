@@ -1,4 +1,5 @@
 import { Inbox } from 'lucide-react';
+import { Fragment } from 'react';
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import {
     Table,
@@ -26,6 +27,8 @@ type ResourceTableProps<T> = {
     emptyDescription?: string;
     onRowClick?: (item: T) => void;
     getRowAriaLabel?: (item: T) => string;
+    expandedRowKey?: string | number | null;
+    renderExpandedRow?: (item: T) => ReactNode;
 };
 
 const interactiveSelector =
@@ -39,6 +42,8 @@ export function ResourceTable<T>({
     emptyDescription = 'No hay información para mostrar con los filtros actuales.',
     onRowClick,
     getRowAriaLabel,
+    expandedRowKey,
+    renderExpandedRow,
 }: ResourceTableProps<T>) {
     const shouldIgnoreRowClick = (
         target: EventTarget | null,
@@ -81,6 +86,9 @@ export function ResourceTable<T>({
                   role: 'button' as const,
                   tabIndex: 0,
                   'aria-label': getRowAriaLabel?.(item),
+                  'aria-expanded': renderExpandedRow
+                      ? expandedRowKey === getRowKey(item)
+                      : undefined,
                   onClick: (event: MouseEvent) => handleRowClick(event, item),
                   onKeyDown: (event: KeyboardEvent) =>
                       handleRowKeyDown(event, item),
@@ -120,57 +128,91 @@ export function ResourceTable<T>({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {data.map((item) => (
-                            <TableRow
-                                key={getRowKey(item)}
-                                className={cn(
-                                    onRowClick &&
-                                        'cursor-pointer focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                                )}
-                                {...interactiveRowProps(item)}
-                            >
-                                {columns.map((column) => (
-                                    <TableCell
-                                        key={column.key}
-                                        className={column.className}
+                        {data.map((item) => {
+                            const rowKey = getRowKey(item);
+                            const isExpanded =
+                                renderExpandedRow !== undefined &&
+                                expandedRowKey === rowKey;
+
+                            return (
+                                <Fragment key={rowKey}>
+                                    <TableRow
+                                        key={rowKey}
+                                        className={cn(
+                                            onRowClick &&
+                                                'cursor-pointer focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                        )}
+                                        {...interactiveRowProps(item)}
                                     >
-                                        {column.cell(item)}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))}
+                                        {columns.map((column) => (
+                                            <TableCell
+                                                key={column.key}
+                                                className={column.className}
+                                            >
+                                                {column.cell(item)}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                    {isExpanded ? (
+                                        <TableRow
+                                            key={`${rowKey}-expanded`}
+                                            className="bg-muted/15 hover:bg-muted/15"
+                                        >
+                                            <TableCell
+                                                colSpan={columns.length}
+                                                className="p-4 sm:p-5"
+                                            >
+                                                {renderExpandedRow?.(item)}
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : null}
+                                </Fragment>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </div>
 
             <div className="grid gap-3 md:hidden">
-                {data.map((item) => (
-                    <article
-                        key={getRowKey(item)}
-                        className={cn(
-                            'grid gap-3 rounded-xl border border-border bg-card p-4 shadow-sm',
-                            onRowClick &&
-                                'cursor-pointer transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                        )}
-                        {...interactiveRowProps(item)}
-                    >
-                        {columns
-                            .filter((column) => !column.mobileHidden)
-                            .map((column) => (
-                                <div
-                                    key={column.key}
-                                    className="grid grid-cols-[minmax(7rem,0.42fr)_1fr] items-start gap-3 text-sm"
-                                >
-                                    <span className="font-medium text-muted-foreground">
-                                        {column.header}
-                                    </span>
-                                    <div className="min-w-0 text-right break-words">
-                                        {column.cell(item)}
-                                    </div>
+                {data.map((item) => {
+                    const isExpanded =
+                        renderExpandedRow !== undefined &&
+                        expandedRowKey === getRowKey(item);
+
+                    return (
+                        <article key={getRowKey(item)}>
+                            <div
+                                className={cn(
+                                    'grid gap-3 rounded-xl border border-border bg-card p-4 shadow-sm',
+                                    onRowClick &&
+                                        'cursor-pointer transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                )}
+                                {...interactiveRowProps(item)}
+                            >
+                                {columns
+                                    .filter((column) => !column.mobileHidden)
+                                    .map((column) => (
+                                        <div
+                                            key={column.key}
+                                            className="grid grid-cols-[minmax(7rem,0.42fr)_1fr] items-start gap-3 text-sm"
+                                        >
+                                            <span className="font-medium text-muted-foreground">
+                                                {column.header}
+                                            </span>
+                                            <div className="min-w-0 text-right break-words">
+                                                {column.cell(item)}
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                            {isExpanded ? (
+                                <div className="mt-3 rounded-xl border border-border bg-muted/15 p-3 sm:p-4">
+                                    {renderExpandedRow?.(item)}
                                 </div>
-                            ))}
-                    </article>
-                ))}
+                            ) : null}
+                        </article>
+                    );
+                })}
             </div>
         </>
     );

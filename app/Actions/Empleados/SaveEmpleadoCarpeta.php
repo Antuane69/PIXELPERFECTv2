@@ -13,7 +13,7 @@ class SaveEmpleadoCarpeta
     public function __construct(private readonly RecordCompanyAccessActivity $recordCompanyAccessActivity) {}
 
     /**
-     * @param  array{nombre: string, user_ids?: array<mixed>}  $data
+     * @param  array{nombre: string, activo?: bool, user_ids?: array<mixed>}  $data
      */
     public function create(Empresa $empresa, User $creador, array $data): EmpleadoCarpeta
     {
@@ -22,6 +22,7 @@ class SaveEmpleadoCarpeta
                 'empresa_id' => $empresa->id,
                 'creado_por_id' => $creador->id,
                 'nombre' => $data['nombre'],
+                'activo' => $data['activo'] ?? true,
             ]);
 
             $userIds = $this->syncUsuarios($carpeta, $data['user_ids'] ?? []);
@@ -31,7 +32,7 @@ class SaveEmpleadoCarpeta
                 $carpeta,
                 'created',
                 [],
-                ['usuarios_con_acceso' => $userIds],
+                ['usuarios_con_acceso' => $userIds, 'activo' => $carpeta->activo],
             );
 
             return $carpeta;
@@ -39,15 +40,25 @@ class SaveEmpleadoCarpeta
     }
 
     /**
-     * @param  array{nombre?: string, user_ids?: array<mixed>}  $data
+     * @param  array{nombre?: string, activo?: bool, user_ids?: array<mixed>}  $data
      */
     public function update(Empresa $empresa, EmpleadoCarpeta $carpeta, User $actor, array $data): EmpleadoCarpeta
     {
         return DB::transaction(function () use ($empresa, $carpeta, $actor, $data): EmpleadoCarpeta {
             $previousUserIds = $this->usuariosConAccesoIds($carpeta);
+            $previousActive = $carpeta->activo;
+            $updates = [];
 
             if (array_key_exists('nombre', $data)) {
-                $carpeta->update(['nombre' => $data['nombre']]);
+                $updates['nombre'] = $data['nombre'];
+            }
+
+            if (array_key_exists('activo', $data)) {
+                $updates['activo'] = $data['activo'];
+            }
+
+            if ($updates !== []) {
+                $carpeta->update($updates);
             }
 
             $userIds = array_key_exists('user_ids', $data)
@@ -58,8 +69,8 @@ class SaveEmpleadoCarpeta
                 $actor,
                 $carpeta,
                 'updated',
-                ['usuarios_con_acceso' => $previousUserIds],
-                ['usuarios_con_acceso' => $userIds],
+                ['usuarios_con_acceso' => $previousUserIds, 'activo' => $previousActive],
+                ['usuarios_con_acceso' => $userIds, 'activo' => $carpeta->activo],
             );
 
             return $carpeta->refresh();

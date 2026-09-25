@@ -18,7 +18,7 @@ use Inertia\Response;
 
 class EmpleadoCarpetaController extends Controller
 {
-    private const INDEX_QUERY_PARAMETERS = ['search', 'archivados', 'per_page', 'page'];
+    private const INDEX_QUERY_PARAMETERS = ['search', 'activo', 'archivados', 'per_page', 'page'];
 
     public function __construct(private readonly EmpresaContext $empresaContext) {}
 
@@ -33,20 +33,23 @@ class EmpleadoCarpetaController extends Controller
         $search = $request->string('search')->squish()->toString();
         $perPage = min(max($request->integer('per_page', 15), 1), 100);
         $archivados = $request->boolean('archivados');
+        $activo = $request->has('activo') ? $request->boolean('activo') : null;
 
         $carpetas = EmpleadoCarpeta::query()
-            ->select(['id', 'empresa_id', 'creado_por_id', 'nombre', 'deleted_at'])
+            ->select(['id', 'empresa_id', 'creado_por_id', 'nombre', 'activo', 'deleted_at'])
             ->whereBelongsTo($empresa)
             ->visiblesPara($usuario)
             ->with(['creadoPor:id,name', 'usuariosConAcceso:id,name'])
             ->when($archivados, fn (Builder $query) => $query->onlyTrashed())
             ->when($search !== '', fn (Builder $query) => $query->where('nombre', 'like', "%{$search}%"))
+            ->when($activo !== null, fn (Builder $query) => $query->where('activo', $activo))
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString()
             ->through(static fn (EmpleadoCarpeta $carpeta): array => [
                 'id' => $carpeta->id,
                 'nombre' => $carpeta->nombre,
+                'activo' => $carpeta->activo,
                 'creado_por_id' => $carpeta->creado_por_id,
                 'creado_por' => [
                     'id' => $carpeta->creadoPor->id,
@@ -83,6 +86,7 @@ class EmpleadoCarpetaController extends Controller
             'usuarios' => $usuarios,
             'filters' => [
                 'search' => $search,
+                'activo' => $activo,
                 'archivados' => $archivados,
                 'perPage' => $perPage,
             ],

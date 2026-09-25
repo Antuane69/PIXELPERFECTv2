@@ -1,5 +1,7 @@
 import { Head, router, useHttp } from '@inertiajs/react';
 import {
+    ChevronDown,
+    ChevronRight,
     Download,
     FilePlus2,
     Folder,
@@ -7,18 +9,19 @@ import {
     Pencil,
     Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { index as empleadosIndex } from '@/actions/App/Http/Controllers/EmpleadoController';
 import {
     destroy,
     download,
     index,
+    listDocuments,
     restore,
     show as showDocumento,
 } from '@/actions/App/Http/Controllers/EmpleadoDocumentoCatalogoController';
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { FiltrosBase } from '@/components/filtros-base';
-import type { FilterFacet } from '@/components/filtros-base';
+import type { FilterFacet, FilterQueryValue } from '@/components/filtros-base';
 import { ResourceHeader } from '@/components/resource-header';
 import { ResourcePagination } from '@/components/resource-pagination';
 import { ResourceTable } from '@/components/resource-table';
@@ -67,6 +70,14 @@ type DocumentoResponse = {
     };
 };
 
+type ListingPayload = {
+    carpeta_id: number;
+    search: string;
+    archivados: boolean;
+    per_page: number;
+    page: number;
+};
+
 export default function EmpleadoDocumentosCatalogoIndex({
     carpetas,
     carpetaSeleccionada,
@@ -81,6 +92,9 @@ export default function EmpleadoDocumentosCatalogoIndex({
         DocumentoResponse
     >();
     const [formOpen, setFormOpen] = useState(false);
+    const [carpetaInicialId, setCarpetaInicialId] = useState<number | null>(
+        null,
+    );
     const [editing, setEditing] = useState<EmpleadoDocumentoCatalogo | null>(
         null,
     );
@@ -94,29 +108,79 @@ export default function EmpleadoDocumentosCatalogoIndex({
         null,
     );
     const showingArchived = filters.archivados;
-    const filterFacets: FilterFacet[] = [
-        {
-            key: 'archivados',
-            label: 'Tipo de registro',
-            defaultValue: false,
-            options: [
-                { value: false, label: 'Vigentes' },
-                { value: true, label: 'Archivados' },
-            ],
-        },
-    ];
+    const canCreateDocument = can('empleados_documentos_catalogo.create');
+    const openCreate = useCallback((folderId: number | null) => {
+        setEditing(null);
+        setCarpetaInicialId(folderId);
+        setDocumentLoadError(null);
+        setFormOpen(true);
+    }, []);
+    const headerActions = useMemo(() => {
+        if (!canCreateDocument) {
+            return undefined;
+        }
+
+        return (
+            <Button onClick={() => openCreate(null)}>
+                <FilePlus2 /> Nuevo documento
+            </Button>
+        );
+    }, [canCreateDocument, openCreate]);
+    const filterFacets = useMemo<FilterFacet[]>(
+        () => [
+            {
+                key: 'archivados',
+                label: 'Tipo de registro',
+                defaultValue: false,
+                options: [
+                    { value: false, label: 'Vigentes' },
+                    { value: true, label: 'Archivados' },
+                ],
+            },
+        ],
+        [],
+    );
+    const submitListing = useCallback(
+        (payload: ListingPayload): Promise<void> =>
+            new Promise((resolve) => {
+                router.post(listDocuments.url(), payload, {
+                    preserveScroll: true,
+                    preserveState: true,
+                    onFinish: () => resolve(),
+                });
+            }),
+        [],
+    );
 
     const selectFolder = (folderId: number) => {
-        router.get(
-            index.url(),
-            {
-                carpeta_id: folderId,
-                search: filters.search || undefined,
-                archivados: showingArchived || undefined,
-                per_page: filters.perPage,
-            },
-            { preserveScroll: true, preserveState: true },
-        );
+        if (folderId === carpetaSeleccionada?.id) {
+            router.get(index.url(), {}, { preserveScroll: true });
+
+            return;
+        }
+
+        void submitListing({
+            carpeta_id: folderId,
+            search: '',
+            archivados: false,
+            per_page: filters.perPage,
+            page: 1,
+        });
+    };
+
+    const applyFolderFilters = (
+        folderId: number,
+        query: Record<string, FilterQueryValue>,
+    ): Promise<void> => {
+        const pageSize = query.per_page;
+
+        return submitListing({
+            carpeta_id: folderId,
+            search: typeof query.search === 'string' ? query.search : '',
+            archivados: query.archivados === true,
+            per_page: typeof pageSize === 'number' ? pageSize : filters.perPage,
+            page: 1,
+        });
     };
 
     const openEdit = async (documento: EmpleadoDocumentoCatalogo) => {
@@ -248,6 +312,86 @@ export default function EmpleadoDocumentosCatalogoIndex({
             ),
         },
     ];
+    const folderColumns: ResourceColumn<FolderOption>[] = [
+        {
+            key: 'carpeta',
+            header: 'Carpeta',
+            cell: (carpeta) => (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-auto w-full justify-start gap-3 px-2 py-2 text-left"
+                    aria-expanded={carpeta.id === carpetaSeleccionada?.id}
+                    aria-label={`${carpeta.id === carpetaSeleccionada?.id ? 'Cerrar' : 'Abrir'} carpeta ${carpeta.nombre}`}
+                    onClick={() => selectFolder(carpeta.id)}
+                >
+                    {carpeta.id === carpetaSeleccionada?.id ? (
+                        <ChevronDown className="size-4 shrink-0 text-primary" />
+                    ) : (
+                        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <Folder className="size-5 shrink-0 text-primary" />
+                    <span className="grid min-w-0 gap-1">
+                        <span className="truncate font-medium">
+                            {carpeta.nombre}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            {carpeta.id === carpetaSeleccionada?.id
+                                ? 'Clic para cerrar'
+                                : 'Clic para abrir documentos'}
+                        </span>
+                    </span>
+                </Button>
+            ),
+        },
+        {
+            key: 'documentos',
+            header: 'Documentos',
+            cell: (carpeta) => (
+                <Badge variant="secondary">
+                    {carpeta.documentos_count}{' '}
+                    {carpeta.documentos_count === 1
+                        ? 'documento'
+                        : 'documentos'}
+                </Badge>
+            ),
+        },
+        {
+            key: 'estado',
+            header: 'Contenido',
+            className: 'w-36',
+            cell: (carpeta) => (
+                <span className="text-sm text-muted-foreground">
+                    {carpeta.id === carpetaSeleccionada?.id
+                        ? 'Carpeta abierta'
+                        : 'Ver registros'}
+                </span>
+            ),
+        },
+        ...(canCreateDocument
+            ? [
+                  {
+                      key: 'opciones',
+                      header: 'Opciones',
+                      className: 'w-32',
+                      cell: (carpeta: FolderOption) => (
+                          <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              aria-label={`Crear documento en ${carpeta.nombre}`}
+                              onClick={(event) => {
+                                  event.stopPropagation();
+                                  openCreate(carpeta.id);
+                              }}
+                          >
+                              <FilePlus2 /> Crear
+                          </Button>
+                      ),
+                  },
+              ]
+            : []),
+    ];
 
     return (
         <>
@@ -256,28 +400,8 @@ export default function EmpleadoDocumentosCatalogoIndex({
                 <ResourceHeader
                     title="Documentos de empleados"
                     description="Administra plantillas HTML por carpeta y genera PDF con los datos del expediente."
-                    actions={
-                        carpetaSeleccionada &&
-                        !showingArchived &&
-                        can('empleados_documentos_catalogo.create') ? (
-                            <Button
-                                onClick={() => {
-                                    setEditing(null);
-                                    setDocumentLoadError(null);
-                                    setFormOpen(true);
-                                }}
-                            >
-                                <FilePlus2 /> Nuevo documento
-                            </Button>
-                        ) : undefined
-                    }
+                    actions={headerActions}
                 />
-
-                {documentLoadError ? (
-                    <p className="text-sm text-destructive" role="alert">
-                        {documentLoadError}
-                    </p>
-                ) : null}
 
                 <section className="grid gap-3" aria-labelledby="folders-title">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -292,110 +416,81 @@ export default function EmpleadoDocumentosCatalogoIndex({
                             contigo.
                         </p>
                     </div>
-                    {carpetas.length ? (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            {carpetas.map((carpeta) => {
-                                const selected =
-                                    carpeta.id === carpetaSeleccionada?.id;
-
-                                return (
-                                    <Button
-                                        key={carpeta.id}
-                                        type="button"
-                                        variant={
-                                            selected ? 'secondary' : 'outline'
-                                        }
-                                        className="h-auto justify-start gap-3 px-4 py-3 text-left"
-                                        aria-pressed={selected}
-                                        onClick={() => selectFolder(carpeta.id)}
+                    <ResourceTable
+                        data={carpetas}
+                        columns={folderColumns}
+                        getRowKey={(carpeta) => carpeta.id}
+                        expandedRowKey={carpetaSeleccionada?.id ?? null}
+                        renderExpandedRow={(carpeta) => (
+                            <div className="grid min-w-0 gap-4">
+                                <FiltrosBase
+                                    key={carpeta.id}
+                                    route={index()}
+                                    defaultSearch={filters.search}
+                                    placeholder="Buscar documento"
+                                    facets={filterFacets}
+                                    query={{
+                                        carpeta_id: carpeta.id,
+                                        archivados: showingArchived,
+                                        per_page: filters.perPage,
+                                    }}
+                                    onApply={(query) =>
+                                        applyFolderFilters(carpeta.id, query)
+                                    }
+                                />
+                                {documentLoadError ? (
+                                    <p
+                                        className="text-sm text-destructive"
+                                        role="alert"
                                     >
-                                        <Folder
-                                            className="size-5 shrink-0 text-primary"
-                                            aria-hidden="true"
-                                        />
-                                        <span className="grid min-w-0 flex-1 gap-1">
-                                            <span className="truncate font-medium">
-                                                {carpeta.nombre}
-                                            </span>
-                                            <span className="text-xs text-muted-foreground">
-                                                {carpeta.documentos_count}{' '}
-                                                {carpeta.documentos_count === 1
-                                                    ? 'documento'
-                                                    : 'documentos'}
-                                            </span>
-                                        </span>
-                                    </Button>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
-                            No tienes carpetas vigentes disponibles. Crea una
-                            carpeta o solicita acceso desde el catálogo de
-                            Carpetas.
-                        </div>
-                    )}
-                </section>
-
-                {carpetaSeleccionada ? (
-                    <>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                                <Folder className="size-4 text-primary" />
-                                <h2 className="text-base font-semibold">
-                                    {carpetaSeleccionada.nombre}
-                                </h2>
+                                        {documentLoadError}
+                                    </p>
+                                ) : null}
+                                <ResourceTable
+                                    data={documentos.data}
+                                    columns={columns}
+                                    getRowKey={(documento) => documento.id}
+                                    emptyTitle={
+                                        showingArchived
+                                            ? 'No hay documentos archivados'
+                                            : 'No hay documentos en esta carpeta'
+                                    }
+                                    emptyDescription={
+                                        showingArchived
+                                            ? 'No existen plantillas archivadas que coincidan con estos filtros.'
+                                            : 'Crea una plantilla HTML para generar PDF desde el expediente de una persona empleada.'
+                                    }
+                                />
+                                <ResourcePagination
+                                    paginator={documentos}
+                                    onPageChange={(page) => {
+                                        void submitListing({
+                                            carpeta_id: carpeta.id,
+                                            search: filters.search,
+                                            archivados: showingArchived,
+                                            per_page: filters.perPage,
+                                            page,
+                                        });
+                                    }}
+                                />
                             </div>
-                            <FiltrosBase
-                                route={index()}
-                                defaultSearch={filters.search}
-                                placeholder="Buscar documento"
-                                facets={filterFacets}
-                                query={{
-                                    carpeta_id: carpetaSeleccionada.id,
-                                    archivados: showingArchived,
-                                    per_page: filters.perPage,
-                                }}
-                            />
-                        </div>
-                        <ResourceTable
-                            data={documentos.data}
-                            columns={columns}
-                            getRowKey={(documento) => documento.id}
-                            emptyTitle={
-                                showingArchived
-                                    ? 'No hay documentos archivados'
-                                    : 'No hay documentos en esta carpeta'
-                            }
-                            emptyDescription={
-                                showingArchived
-                                    ? 'No existen plantillas archivadas que coincidan con estos filtros.'
-                                    : 'Crea una plantilla HTML para generar PDF desde el expediente de una persona empleada.'
-                            }
-                        />
-                        <ResourcePagination paginator={documentos} />
-                    </>
-                ) : (
-                    <div className="rounded-xl border border-dashed border-border p-8 text-center">
-                        <Folder className="mx-auto size-8 text-muted-foreground" />
-                        <p className="mt-3 font-medium">
-                            Selecciona una carpeta
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Sus documentos aparecerán aquí, ordenados por
-                            nombre.
-                        </p>
-                    </div>
-                )}
+                        )}
+                        emptyTitle="No tienes carpetas vigentes disponibles"
+                        emptyDescription="Crea una carpeta o solicita acceso desde el catálogo de Carpetas."
+                    />
+                </section>
             </main>
 
-            {formOpen && carpetaSeleccionada ? (
+            {formOpen ? (
                 <DocumentoFormDialog
-                    key={editing?.id ?? 'nuevo'}
+                    key={
+                        editing?.id ??
+                        `nuevo-${carpetaInicialId ?? 'sin-carpeta'}`
+                    }
                     open
                     onOpenChange={setFormOpen}
                     documento={editing}
-                    carpetaIdInicial={carpetaSeleccionada.id}
+                    carpetaIdInicial={carpetaInicialId}
                     carpetas={carpetas}
                     modulosDisponibles={modulosDisponibles}
                     variables={variables}
