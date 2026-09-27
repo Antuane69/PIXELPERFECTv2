@@ -7,6 +7,7 @@ use App\Services\Reportes\Definiciones\EmpleadosReporte;
 use App\Services\Reportes\Definiciones\PuestosReporte;
 use App\Services\Reportes\Definiciones\RolesReporte;
 use App\Services\Reportes\Definiciones\TiposDocumentoEmpleadoReporte;
+use App\Services\Reportes\Definiciones\TiposPermisoReporte;
 use App\Services\Reportes\Definiciones\UsuariosReporte;
 use Illuminate\Contracts\Container\Container;
 
@@ -18,6 +19,7 @@ class RegistroReportes
         'puestos' => PuestosReporte::class,
         'roles' => RolesReporte::class,
         'tipos-documento-empleados' => TiposDocumentoEmpleadoReporte::class,
+        'tipos-permisos' => TiposPermisoReporte::class,
         'usuarios' => UsuariosReporte::class,
     ];
 
@@ -27,6 +29,7 @@ class RegistroReportes
         'puestos' => 'puestos',
         'roles' => 'roles',
         'tipos-documento-empleados' => 'empleados',
+        'tipos-permisos' => 'permisos_laborales',
         'usuarios' => 'usuarios',
     ];
 

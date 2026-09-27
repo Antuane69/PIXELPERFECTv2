@@ -15,12 +15,21 @@ use App\Http\Controllers\EmpleadoDocumentoImpresionController;
 use App\Http\Controllers\EmpresaContextController;
 use App\Http\Controllers\EmpresaDashboardController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\FaltasReglamento\FaltaReglamentoCatalogoController;
+use App\Http\Controllers\FaltasReglamento\FaltaReglamentoController;
+use App\Http\Controllers\FaltasReglamento\FaltaReglamentoEvidenciaController;
+use App\Http\Controllers\FaltasReglamento\TipoFaltaReglamentoController;
+use App\Http\Controllers\Incapacidades\IncapacidadController;
+use App\Http\Controllers\PermisosLaborales\PermisoLaboralController;
+use App\Http\Controllers\PermisosLaborales\TipoPermisoController;
 use App\Http\Controllers\PuestoController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ShowEmpleadoAvatarController;
 use App\Http\Controllers\ShowEmpleadoDocumentoController;
 use App\Http\Controllers\TipoDocumentoEmpleadoController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VacacionController;
+use App\Http\Controllers\Vacaciones\DiaFestivoController;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -86,6 +95,107 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
                         ->name('puestos.restore');
                     Route::resource('puestos', PuestoController::class)
                         ->only(['index', 'store', 'update', 'destroy']);
+                });
+                Route::middleware('modulo.habilitado:vacaciones')->group(function (): void {
+                    Route::get('vacaciones', [VacacionController::class, 'index'])->name('vacaciones.index');
+                    Route::post('vacaciones', [VacacionController::class, 'store'])->name('vacaciones.store');
+                    Route::post('vacaciones/filtros', [VacacionController::class, 'filtrar'])->name('vacaciones.filtros');
+                    Route::post('vacaciones/pagina', [VacacionController::class, 'cambiarPagina'])->name('vacaciones.pagina');
+                    Route::post('vacaciones/{vacacion}/autorizar', [VacacionController::class, 'autorizar'])->name('vacaciones.autorizar');
+                    Route::post('vacaciones/{vacacion}/rechazar', [VacacionController::class, 'rechazar'])->name('vacaciones.rechazar');
+                    Route::post('vacaciones/dias-festivos', [DiaFestivoController::class, 'store'])
+                        ->name('vacaciones.dias-festivos.store');
+                    Route::put('vacaciones/dias-festivos/{diaFestivo}', [DiaFestivoController::class, 'update'])
+                        ->name('vacaciones.dias-festivos.update');
+                    Route::delete('vacaciones/dias-festivos/{diaFestivo}', [DiaFestivoController::class, 'destroy'])
+                        ->name('vacaciones.dias-festivos.destroy');
+                });
+                Route::middleware('modulo.habilitado:permisos_laborales')->group(function (): void {
+                    Route::get('permisos-laborales', [PermisoLaboralController::class, 'index'])
+                        ->name('permisos-laborales.index');
+                    Route::post('permisos-laborales', [PermisoLaboralController::class, 'store'])
+                        ->name('permisos-laborales.store');
+                    Route::post('permisos-laborales/filtros', [PermisoLaboralController::class, 'filtrar'])
+                        ->name('permisos-laborales.filtros');
+                    Route::post('permisos-laborales/pagina', [PermisoLaboralController::class, 'cambiarPagina'])
+                        ->name('permisos-laborales.pagina');
+                    Route::post('permisos-laborales/{permisoLaboral}/autorizar', [PermisoLaboralController::class, 'autorizar'])
+                        ->name('permisos-laborales.autorizar');
+                    Route::post('permisos-laborales/{permisoLaboral}/rechazar', [PermisoLaboralController::class, 'rechazar'])
+                        ->name('permisos-laborales.rechazar');
+                    Route::patch('tipos-permisos/{tipoPermiso}/restaurar', [TipoPermisoController::class, 'restore'])
+                        ->withTrashed()
+                        ->name('tipos-permisos.restore');
+                    Route::post('tipos-permisos/filtros', [TipoPermisoController::class, 'filtrar'])
+                        ->name('tipos-permisos.filtros');
+                    Route::post('tipos-permisos/pagina', [TipoPermisoController::class, 'cambiarPagina'])
+                        ->name('tipos-permisos.pagina');
+                    Route::resource('tipos-permisos', TipoPermisoController::class)
+                        ->parameters(['tipos-permisos' => 'tipoPermiso'])
+                        ->names('tipos-permisos')
+                        ->only(['index', 'store', 'update', 'destroy']);
+                    Route::post(
+                        'reportes/tipos-permisos/exportar',
+                        [ExportController::class, 'exportarTiposPermiso'],
+                    )->name('reportes.tipos-permisos.exportar');
+                });
+                Route::middleware('modulo.habilitado:faltas_reglamento')->group(function (): void {
+                    Route::get('faltas-reglamento', [FaltaReglamentoController::class, 'index'])
+                        ->name('faltas-reglamento.index');
+                    Route::post('faltas-reglamento', [FaltaReglamentoController::class, 'store'])
+                        ->name('faltas-reglamento.store');
+                    Route::post('faltas-reglamento/filtros', [FaltaReglamentoController::class, 'filtrar'])
+                        ->name('faltas-reglamento.filtros');
+                    Route::post('faltas-reglamento/pagina', [FaltaReglamentoController::class, 'cambiarPagina'])
+                        ->name('faltas-reglamento.pagina');
+                    Route::post('faltas-reglamento/{faltaReglamento}/autorizar', [FaltaReglamentoController::class, 'autorizar'])
+                        ->name('faltas-reglamento.autorizar');
+                    Route::post('faltas-reglamento/{faltaReglamento}/rechazar', [FaltaReglamentoController::class, 'rechazar'])
+                        ->name('faltas-reglamento.rechazar');
+                    Route::get(
+                        'faltas-reglamento/{faltaReglamento}/evidencias/{evidencia}',
+                        [FaltaReglamentoEvidenciaController::class, 'download'],
+                    )->name('faltas-reglamento.evidencias.download');
+
+                    Route::patch('tipos-falta-reglamento/{tipoFaltaReglamento}/restaurar', [TipoFaltaReglamentoController::class, 'restore'])
+                        ->withTrashed()
+                        ->name('tipos-falta-reglamento.restore');
+                    Route::post('tipos-falta-reglamento/filtros', [TipoFaltaReglamentoController::class, 'filtrar'])
+                        ->name('tipos-falta-reglamento.filtros');
+                    Route::post('tipos-falta-reglamento/pagina', [TipoFaltaReglamentoController::class, 'cambiarPagina'])
+                        ->name('tipos-falta-reglamento.pagina');
+                    Route::resource('tipos-falta-reglamento', TipoFaltaReglamentoController::class)
+                        ->parameters(['tipos-falta-reglamento' => 'tipoFaltaReglamento'])
+                        ->names('tipos-falta-reglamento')
+                        ->only(['index', 'store', 'update', 'destroy']);
+
+                    Route::patch('catalogo-faltas-reglamento/{faltaReglamentoCatalogo}/restaurar', [FaltaReglamentoCatalogoController::class, 'restore'])
+                        ->withTrashed()
+                        ->name('catalogo-faltas-reglamento.restore');
+                    Route::post('catalogo-faltas-reglamento/filtros', [FaltaReglamentoCatalogoController::class, 'filtrar'])
+                        ->name('catalogo-faltas-reglamento.filtros');
+                    Route::post('catalogo-faltas-reglamento/pagina', [FaltaReglamentoCatalogoController::class, 'cambiarPagina'])
+                        ->name('catalogo-faltas-reglamento.pagina');
+                    Route::resource('catalogo-faltas-reglamento', FaltaReglamentoCatalogoController::class)
+                        ->parameters(['catalogo-faltas-reglamento' => 'faltaReglamentoCatalogo'])
+                        ->names('catalogo-faltas-reglamento')
+                        ->only(['index', 'store', 'update', 'destroy']);
+                });
+                Route::middleware('modulo.habilitado:incapacidades')->group(function (): void {
+                    Route::get('incapacidades', [IncapacidadController::class, 'index'])
+                        ->name('incapacidades.index');
+                    Route::post('incapacidades', [IncapacidadController::class, 'store'])
+                        ->name('incapacidades.store');
+                    Route::post('incapacidades/filtros', [IncapacidadController::class, 'filtrar'])
+                        ->name('incapacidades.filtros');
+                    Route::post('incapacidades/pagina', [IncapacidadController::class, 'cambiarPagina'])
+                        ->name('incapacidades.pagina');
+                    Route::post('incapacidades/{incapacidad}/autorizar', [IncapacidadController::class, 'autorizar'])
+                        ->name('incapacidades.autorizar');
+                    Route::post('incapacidades/{incapacidad}/rechazar', [IncapacidadController::class, 'rechazar'])
+                        ->name('incapacidades.rechazar');
+                    Route::get('incapacidades/{incapacidad}/archivo', [IncapacidadController::class, 'descargarArchivo'])
+                        ->name('incapacidades.archivo');
                 });
                 Route::middleware('modulo.habilitado:empleados')->group(function (): void {
                     Route::patch(

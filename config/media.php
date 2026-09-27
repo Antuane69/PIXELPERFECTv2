@@ -7,5 +7,6 @@ return [
         'jpeg_quality' => (int) env('IMAGE_JPEG_QUALITY', 82),
         'png_compression' => (int) env('IMAGE_PNG_COMPRESSION', 6),
         'webp_quality' => (int) env('IMAGE_WEBP_QUALITY', 82),
+        'avif_quality' => (int) env('IMAGE_AVIF_QUALITY', 82),
     ],
 ];

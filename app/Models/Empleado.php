@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\FaltasReglamento\FaltaReglamento;
+use App\Models\FaltasReglamento\TipoFaltaReglamento;
+use App\Models\PermisosLaborales\PermisoLaboral;
 use Database\Factories\EmpleadoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
@@ -15,6 +19,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 #[Fillable([
     'empresa_id',
+    'user_id',
     'nombre',
     'nombre_usuario',
     'correo',
@@ -72,6 +77,12 @@ class Empleado extends Model
         return $this->belongsTo(Empresa::class);
     }
 
+    /** @return BelongsTo<User, $this> */
+    public function usuario(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
     /**
      * @return HasMany<EmpleadoDocumento, $this>
      */
@@ -80,12 +91,60 @@ class Empleado extends Model
         return $this->hasMany(EmpleadoDocumento::class);
     }
 
+    /** @return HasMany<Vacacion, $this> */
+    public function vacaciones(): HasMany
+    {
+        return $this->hasMany(Vacacion::class);
+    }
+
+    /** @return HasMany<PermisoLaboral, $this> */
+    public function permisosLaborales(): HasMany
+    {
+        return $this->hasMany(PermisoLaboral::class);
+    }
+
+    /** @return HasMany<Incapacidad, $this> */
+    public function incapacidades(): HasMany
+    {
+        return $this->hasMany(Incapacidad::class);
+    }
+
+    /** @return HasMany<FaltaReglamento, $this> */
+    public function faltasReglamento(): HasMany
+    {
+        return $this->hasMany(FaltaReglamento::class);
+    }
+
+    /** @return BelongsToMany<TipoFaltaReglamento, $this> */
+    public function tiposFaltaReglamento(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            TipoFaltaReglamento::class,
+            'empleado_tipo_falta_reglamento',
+            'empleado_id',
+            'tipo_falta_reglamento_id',
+        )->withPivot(['empresa_id', 'cantidad'])->withTimestamps()->withTrashed();
+    }
+
+    /** @return list<string> */
+    public function diasDescansoConfigurados(): array
+    {
+        $diasDescanso = $this->getAttribute('dias_descanso');
+
+        if (! is_array($diasDescanso)) {
+            return [];
+        }
+
+        return array_values(array_filter($diasDescanso, static fn (mixed $dia): bool => is_string($dia)));
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
             ->useLogName('empleados')
             ->logOnly([
                 'empresa_id',
+                'user_id',
                 'nombre',
                 'nombre_usuario',
                 'correo',

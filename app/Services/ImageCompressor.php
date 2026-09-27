@@ -7,24 +7,18 @@ use RuntimeException;
 
 final class ImageCompressor
 {
-    private const SUPPORTED_MIME_TYPES = [
-        'image/jpeg',
-        'image/png',
-        'image/webp',
-    ];
-
     /**
      * @return array{contents: string, mime_type: string, extension: string}|null
      */
-    public function compressIfImage(UploadedFile $file): ?array
+    public function compressIfImage(UploadedFile $file, bool $enforceSourcePixelLimit = true): ?array
     {
         $mimeType = $file->getMimeType();
 
-        if (! is_string($mimeType) || ! in_array($mimeType, self::SUPPORTED_MIME_TYPES, true)) {
+        if (! is_string($mimeType) || ! str_starts_with($mimeType, 'image/')) {
             return null;
         }
 
-        return $this->compressContentsIfImage($file->getContent(), $mimeType);
+        return $this->compressContentsIfImage($file->getContent(), $mimeType, $enforceSourcePixelLimit);
     }
 
     /**
@@ -33,9 +27,9 @@ final class ImageCompressor
     public function compressContentsIfImage(
         string $contents,
         string $mimeType,
-        bool $enforceSourcePixelLimit = false,
+        bool $enforceSourcePixelLimit = true,
     ): ?array {
-        if (! in_array($mimeType, self::SUPPORTED_MIME_TYPES, true)) {
+        if (! str_starts_with($mimeType, 'image/')) {
             return null;
         }
 
@@ -43,7 +37,23 @@ final class ImageCompressor
             throw new RuntimeException('No se pudo leer la imagen subida.');
         }
 
-        if ($enforceSourcePixelLimit && ! $this->isWithinConfiguredLimits($contents, $mimeType)) {
+        if ($mimeType === 'image/svg+xml') {
+            return [
+                'contents' => $this->compressSvg($contents),
+                'mime_type' => $mimeType,
+                'extension' => 'svg',
+            ];
+        }
+
+        $imageInfo = @getimagesizefromstring($contents);
+
+        if (! is_array($imageInfo) || ! str_starts_with($imageInfo['mime'], 'image/')) {
+            throw new RuntimeException('La imagen subida no pudo ser procesada.');
+        }
+
+        $sourceMimeType = $imageInfo['mime'];
+
+        if ($enforceSourcePixelLimit && ! $this->isWithinConfiguredLimits($contents, $sourceMimeType)) {
             throw new RuntimeException('La imagen no es válida o supera el límite de píxeles permitido.');
         }
 
@@ -53,18 +63,19 @@ final class ImageCompressor
             throw new RuntimeException('La imagen subida no pudo ser procesada.');
         }
 
-        $image = $this->resizeIfNeeded($source, $mimeType);
+        $outputMimeType = $this->outputMimeType($sourceMimeType);
+        $image = $this->resizeIfNeeded($source, $outputMimeType);
 
         try {
-            $compressedContents = $this->encode($image, $mimeType);
+            $compressedContents = $this->encode($image, $outputMimeType);
         } finally {
             imagedestroy($image);
         }
 
         return [
             'contents' => $compressedContents,
-            'mime_type' => $mimeType,
-            'extension' => $this->extensionForMimeType($mimeType),
+            'mime_type' => $outputMimeType,
+            'extension' => $this->extensionForMimeType($outputMimeType),
         ];
     }
 
@@ -73,7 +84,8 @@ final class ImageCompressor
         $imageInfo = @getimagesizefromstring($contents);
 
         if (! is_array($imageInfo)
-            || $imageInfo['mime'] !== $mimeType
+            || ! str_starts_with($imageInfo['mime'], 'image/')
+            || ! str_starts_with($mimeType, 'image/')
             || $imageInfo[0] < 1
             || $imageInfo[1] < 1) {
             return false;
@@ -129,7 +141,7 @@ final class ImageCompressor
 
     private function prepareCanvas(\GdImage $canvas, string $mimeType): void
     {
-        if (! in_array($mimeType, ['image/png', 'image/webp'], true)) {
+        if (! in_array($mimeType, ['image/png', 'image/webp', 'image/gif'], true)) {
             return;
         }
 
@@ -172,6 +184,19 @@ final class ImageCompressor
                         $this->boundedConfigValue('media.images.webp_quality', 82, 0, 100),
                     )
                     : false,
+                'image/gif' => function_exists('imagegif')
+                    ? imagegif($image)
+                    : false,
+                'image/bmp' => function_exists('imagebmp')
+                    ? imagebmp($image)
+                    : false,
+                'image/avif' => function_exists('imageavif')
+                    ? imageavif(
+                        $image,
+                        null,
+                        $this->boundedConfigValue('media.images.avif_quality', 82, 0, 100),
+                    )
+                    : false,
                 default => false,
             };
             $contents = ob_get_contents();
@@ -201,7 +226,77 @@ final class ImageCompressor
             'image/jpeg' => 'jpg',
             'image/png' => 'png',
             'image/webp' => 'webp',
-            default => throw new RuntimeException('Tipo de imagen no soportado.'),
+            'image/gif' => 'gif',
+            'image/bmp' => 'bmp',
+            'image/avif' => 'avif',
+            'image/svg+xml' => 'svg',
+            default => 'png',
         };
+    }
+
+    private function outputMimeType(string $sourceMimeType): string
+    {
+        $encoderExists = match ($sourceMimeType) {
+            'image/jpeg' => function_exists('imagejpeg'),
+            'image/png' => function_exists('imagepng'),
+            'image/webp' => function_exists('imagewebp'),
+            'image/gif' => function_exists('imagegif'),
+            'image/bmp' => function_exists('imagebmp'),
+            'image/avif' => function_exists('imageavif'),
+            default => false,
+        };
+
+        return $encoderExists ? $sourceMimeType : 'image/png';
+    }
+
+    private function compressSvg(string $contents): string
+    {
+        if (! class_exists(\DOMDocument::class)) {
+            throw new RuntimeException('No se pudo optimizar el archivo SVG.');
+        }
+
+        $document = new \DOMDocument;
+        $document->preserveWhiteSpace = false;
+        $document->resolveExternals = false;
+        $document->substituteEntities = false;
+        $previousErrorMode = libxml_use_internal_errors(true);
+
+        try {
+            $loaded = $document->loadXML($contents, LIBXML_NONET | LIBXML_COMPACT | LIBXML_NOBLANKS);
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previousErrorMode);
+        }
+
+        if (! $loaded
+            || $document->documentElement === null
+            || strtolower($document->documentElement->localName) !== 'svg') {
+            throw new RuntimeException('El archivo SVG no es válido.');
+        }
+
+        $xpath = new \DOMXPath($document);
+        $comments = $xpath->query('//comment()');
+
+        if ($comments !== false) {
+            foreach ($comments as $comment) {
+                if (! $comment instanceof \DOMNode) {
+                    continue;
+                }
+
+                $parent = $comment->parentNode;
+
+                if ($parent instanceof \DOMNode) {
+                    $parent->removeChild($comment);
+                }
+            }
+        }
+
+        $compressedContents = $document->saveXML($document->documentElement);
+
+        if (! is_string($compressedContents) || $compressedContents === '') {
+            throw new RuntimeException('No se pudo optimizar el archivo SVG.');
+        }
+
+        return $compressedContents;
     }
 }

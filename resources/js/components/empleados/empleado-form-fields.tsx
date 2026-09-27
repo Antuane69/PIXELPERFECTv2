@@ -46,18 +46,35 @@ type Props = {
     empleado: Empleado | null;
     puestos: Puesto[];
     tiposDocumento: TipoDocumentoEmpleado[];
+    usuarios: EmpleadoUsuarioOption[];
     errors: Record<string, string>;
+};
+
+export type EmpleadoUsuarioOption = {
+    id: number;
+    nombre: string;
+    correo: string;
+    activo: boolean;
+    empleadoId: number | null;
 };
 
 type FormFieldProps = {
     id: string;
     label: string;
     error?: string;
+    errorId?: string;
     hint?: string;
     children: ReactNode;
 };
 
-function FormField({ id, label, error, hint, children }: FormFieldProps) {
+function FormField({
+    id,
+    label,
+    error,
+    errorId,
+    hint,
+    children,
+}: FormFieldProps) {
     return (
         <div className="grid gap-2 self-start">
             <Label htmlFor={id}>{label}</Label>
@@ -65,7 +82,7 @@ function FormField({ id, label, error, hint, children }: FormFieldProps) {
             {hint ? (
                 <p className="text-xs text-muted-foreground">{hint}</p>
             ) : null}
-            <InputError message={error} />
+            <InputError id={errorId} message={error} />
         </div>
     );
 }
@@ -302,6 +319,7 @@ export function EmpleadoFormFields({
     empleado,
     puestos,
     tiposDocumento,
+    usuarios,
     errors,
 }: Props) {
     const isCreating = empleado === null;
@@ -332,6 +350,12 @@ export function EmpleadoFormFields({
     );
     const visibleDocumentTypes = tiposDocumento.filter(
         (tipo) => tipo.activo !== false || existingDocument(empleado, tipo.id),
+    );
+    const usuariosDisponibles = usuarios.filter(
+        (usuario) =>
+            (usuario.activo || usuario.id === empleado?.user_id) &&
+            (usuario.empleadoId === null ||
+                usuario.empleadoId === empleado?.id),
     );
     const periodo = Number(periodoPruebaMeses);
     const trialSchedule =
@@ -379,6 +403,57 @@ export function EmpleadoFormFields({
     return (
         <AntForm component={false} validateTrigger={['onChange', 'onBlur']}>
             <div className="grid gap-5 pb-1">
+                <FormSection
+                    title="Cuenta de acceso"
+                    description="Vincula este expediente a una cuenta de usuario de la empresa para habilitar solicitudes personales de vacaciones."
+                >
+                    <FormField
+                        id="empleado-user-id"
+                        label="Cuenta de usuario (opcional)"
+                        error={errors.user_id}
+                        errorId="empleado-user-id-error"
+                        hint="Una cuenta solo puede vincularse a un expediente por empresa."
+                    >
+                        <Select
+                            name="user_id"
+                            defaultValue={
+                                empleado?.user_id
+                                    ? String(empleado.user_id)
+                                    : 'sin_vinculo'
+                            }
+                        >
+                            <SelectTrigger
+                                id="empleado-user-id"
+                                className="w-full"
+                                aria-invalid={Boolean(errors.user_id)}
+                                aria-describedby={
+                                    errors.user_id
+                                        ? 'empleado-user-id-error'
+                                        : undefined
+                                }
+                            >
+                                <SelectValue placeholder="Selecciona una cuenta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="sin_vinculo">
+                                    Sin cuenta vinculada
+                                </SelectItem>
+                                {usuariosDisponibles.map((usuario) => (
+                                    <SelectItem
+                                        key={usuario.id}
+                                        value={String(usuario.id)}
+                                    >
+                                        {usuario.nombre} ({usuario.correo})
+                                        {!usuario.activo
+                                            ? ' · membresía inactiva'
+                                            : ''}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </FormField>
+                </FormSection>
+
                 <FormSection
                     title="Datos generales"
                     description="Identidad, contacto y datos personales del empleado."
@@ -799,11 +874,7 @@ export function EmpleadoFormFields({
                                             id={`empleado-${field}`}
                                             type="number"
                                             name={field}
-                                            min={
-                                                field === 'dias_vacaciones'
-                                                    ? '2'
-                                                    : '0'
-                                            }
+                                            min="0"
                                             step="1"
                                             defaultValue={
                                                 field === 'dias_vacaciones'

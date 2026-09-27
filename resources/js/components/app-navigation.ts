@@ -3,22 +3,33 @@ import {
     BriefcaseBusiness,
     Building2,
     Boxes,
+    CalendarDays,
     FileText,
     Folder,
     FolderOpen,
+    HeartPulse,
     KeyRound,
     LayoutDashboard,
+    ListChecks,
     ShieldCheck,
+    ShieldAlert,
     UserRoundCog,
     UsersRound,
 } from 'lucide-react';
 import { index as carpetasEmpleadosIndex } from '@/actions/App/Http/Controllers/EmpleadoCarpetaController';
 import { index as empleadosIndex } from '@/actions/App/Http/Controllers/EmpleadoController';
 import { index as documentosCatalogoIndex } from '@/actions/App/Http/Controllers/EmpleadoDocumentoCatalogoController';
+import { index as catalogoFaltasReglamentoIndex } from '@/actions/App/Http/Controllers/FaltasReglamento/FaltaReglamentoCatalogoController';
+import { index as faltasReglamentoIndex } from '@/actions/App/Http/Controllers/FaltasReglamento/FaltaReglamentoController';
+import { index as tiposFaltaReglamentoIndex } from '@/actions/App/Http/Controllers/FaltasReglamento/TipoFaltaReglamentoController';
+import { index as incapacidadesIndex } from '@/actions/App/Http/Controllers/Incapacidades/IncapacidadController';
+import { index as permisosLaboralesIndex } from '@/actions/App/Http/Controllers/PermisosLaborales/PermisoLaboralController';
+import { index as tiposPermisosIndex } from '@/actions/App/Http/Controllers/PermisosLaborales/TipoPermisoController';
 import { index as puestosIndex } from '@/actions/App/Http/Controllers/PuestoController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
 import { index as tiposDocumentoIndex } from '@/actions/App/Http/Controllers/TipoDocumentoEmpleadoController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
+import { index as vacacionesIndex } from '@/actions/App/Http/Controllers/VacacionController';
 import { dashboard } from '@/routes';
 import { inicio as empresaInicio } from '@/routes/empresas';
 import { index as logsIndex } from '@/routes/logs';
@@ -57,6 +68,65 @@ export function mainNavItems(hasEmpresaContext = false): NavItem[] {
                 icon: BriefcaseBusiness,
                 permission: 'puestos.view',
                 module: 'puestos',
+            },
+            {
+                title: 'Vacaciones',
+                href: vacacionesIndex(),
+                icon: CalendarDays,
+                permissionsAnyOf: ['vacaciones.view', 'vacaciones.review'],
+                module: 'vacaciones',
+            },
+            {
+                title: 'Permisos laborales',
+                href: permisosLaboralesIndex(),
+                icon: CalendarDays,
+                permissionsAnyOf: [
+                    'permisos_laborales.view',
+                    'permisos_laborales.review',
+                ],
+                module: 'permisos_laborales',
+            },
+            {
+                title: 'Faltas al reglamento',
+                href: faltasReglamentoIndex(),
+                icon: ShieldAlert,
+                permissionsAnyOf: [
+                    'faltas_reglamento.view',
+                    'faltas_reglamento.create',
+                    'faltas_reglamento.review',
+                ],
+                module: 'faltas_reglamento',
+            },
+            {
+                title: 'Tipos de falta',
+                href: tiposFaltaReglamentoIndex(),
+                icon: ListChecks,
+                permission: 'tipos_falta_reglamento.view',
+                module: 'faltas_reglamento',
+            },
+            {
+                title: 'Faltas del catálogo',
+                href: catalogoFaltasReglamentoIndex(),
+                icon: FileText,
+                permission: 'faltas_reglamento_catalogo.view',
+                module: 'faltas_reglamento',
+            },
+            {
+                title: 'Incapacidades',
+                href: incapacidadesIndex(),
+                icon: HeartPulse,
+                permissionsAnyOf: [
+                    'incapacidades.view',
+                    'incapacidades.review',
+                ],
+                module: 'incapacidades',
+            },
+            {
+                title: 'Tipos de permisos',
+                href: tiposPermisosIndex(),
+                icon: FileText,
+                permission: 'tipos_permisos.view',
+                module: 'permisos_laborales',
             },
             {
                 title: 'Empleados',
@@ -172,6 +242,11 @@ export function visibleNavItems(
             (item.permission &&
                 !permissions.includes('*') &&
                 !permissions.includes(item.permission)) ||
+            (item.permissionsAnyOf &&
+                !permissions.includes('*') &&
+                !item.permissionsAnyOf.some((permission) =>
+                    permissions.includes(permission),
+                )) ||
             (item.children && !children?.length)
         ) {
             return [];

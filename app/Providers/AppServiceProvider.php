@@ -2,14 +2,30 @@
 
 namespace App\Providers;
 
+use App\Models\DiaFestivo;
 use App\Models\Empresa;
+use App\Models\FaltasReglamento\FaltaReglamento;
+use App\Models\FaltasReglamento\FaltaReglamentoCatalogo;
+use App\Models\FaltasReglamento\TipoFaltaReglamento;
+use App\Models\Incapacidad;
 use App\Models\Modulo;
+use App\Models\PermisosLaborales\PermisoLaboral;
+use App\Models\PermisosLaborales\TipoPermiso;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Vacacion;
+use App\Policies\FaltasReglamento\FaltaReglamentoCatalogoPolicy;
+use App\Policies\FaltasReglamento\FaltaReglamentoPolicy;
+use App\Policies\FaltasReglamento\TipoFaltaReglamentoPolicy;
+use App\Policies\Incapacidades\IncapacidadPolicy;
 use App\Policies\ModuloPolicy;
+use App\Policies\PermisosLaborales\PermisoLaboralPolicy;
+use App\Policies\PermisosLaborales\TipoPermisoPolicy;
 use App\Policies\PermissionPolicy;
 use App\Policies\RolePolicy;
+use App\Policies\Vacaciones\DiaFestivoPolicy;
+use App\Policies\VacacionPolicy;
 use App\Services\Empresas\EmpresaContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
@@ -47,6 +63,14 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Role::class, RolePolicy::class);
         Gate::policy(Modulo::class, ModuloPolicy::class);
         Gate::policy(Permission::class, PermissionPolicy::class);
+        Gate::policy(PermisoLaboral::class, PermisoLaboralPolicy::class);
+        Gate::policy(Incapacidad::class, IncapacidadPolicy::class);
+        Gate::policy(TipoPermiso::class, TipoPermisoPolicy::class);
+        Gate::policy(FaltaReglamento::class, FaltaReglamentoPolicy::class);
+        Gate::policy(FaltaReglamentoCatalogo::class, FaltaReglamentoCatalogoPolicy::class);
+        Gate::policy(TipoFaltaReglamento::class, TipoFaltaReglamentoPolicy::class);
+        Gate::policy(Vacacion::class, VacacionPolicy::class);
+        Gate::policy(DiaFestivo::class, DiaFestivoPolicy::class);
         Gate::define(
             'viewLogViewer',
             static fn (User $user): bool => $user->es_superadministrador_plataforma,

@@ -11,6 +11,7 @@ type ArchivedRecordsToggleProps = {
     showingArchived: boolean;
     activeLabel: string;
     archivedLabel: string;
+    onToggle?: () => void;
 };
 
 export function ArchivedRecordsToggle({
@@ -18,7 +19,17 @@ export function ArchivedRecordsToggle({
     showingArchived,
     activeLabel,
     archivedLabel,
+    onToggle,
 }: ArchivedRecordsToggleProps) {
+    if (onToggle) {
+        return (
+            <Button variant="outline" onClick={onToggle}>
+                {showingArchived ? <List /> : <Archive />}
+                {showingArchived ? activeLabel : archivedLabel}
+            </Button>
+        );
+    }
+
     return (
         <Button variant="outline" asChild>
             <Link href={route.url} preserveScroll>

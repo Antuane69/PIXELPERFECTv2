@@ -23,6 +23,7 @@ type ConfirmDeleteDialogProps = {
     form: DeleteForm;
     subject: string;
     description?: string;
+    actionVerb?: 'Eliminar' | 'Archivar';
 };
 
 export function ConfirmDeleteDialog({
@@ -31,13 +32,14 @@ export function ConfirmDeleteDialog({
     form,
     subject,
     description,
+    actionVerb = 'Eliminar',
 }: ConfirmDeleteDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="border-t-[3px] border-t-destructive sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle className="font-bold text-primary">
-                        Eliminar {subject}
+                        {actionVerb} {subject}
                     </DialogTitle>
                     <DialogDescription>
                         {description ??
@@ -88,7 +90,7 @@ export function ConfirmDeleteDialog({
                                                 aria-hidden="true"
                                             />
                                         )}
-                                        Eliminar
+                                        {actionVerb}
                                     </Button>
                                 </DialogFooter>
                             </div>

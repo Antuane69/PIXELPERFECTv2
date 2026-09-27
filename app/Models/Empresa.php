@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\EstadoEmpresa;
+use App\Models\PermisosLaborales\PermisoLaboral;
+use App\Models\PermisosLaborales\TipoPermiso;
 use Database\Factories\EmpresaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -158,6 +160,36 @@ class Empresa extends Model
     public function empleados(): HasMany
     {
         return $this->hasMany(Empleado::class);
+    }
+
+    /** @return HasMany<Vacacion, $this> */
+    public function vacaciones(): HasMany
+    {
+        return $this->hasMany(Vacacion::class);
+    }
+
+    /** @return HasMany<PermisoLaboral, $this> */
+    public function permisosLaborales(): HasMany
+    {
+        return $this->hasMany(PermisoLaboral::class, 'empresa_id');
+    }
+
+    /** @return HasMany<Incapacidad, $this> */
+    public function incapacidades(): HasMany
+    {
+        return $this->hasMany(Incapacidad::class, 'empresa_id');
+    }
+
+    /** @return HasMany<TipoPermiso, $this> */
+    public function tiposPermisos(): HasMany
+    {
+        return $this->hasMany(TipoPermiso::class, 'empresa_id');
+    }
+
+    /** @return HasMany<DiaFestivo, $this> */
+    public function diasFestivos(): HasMany
+    {
+        return $this->hasMany(DiaFestivo::class);
     }
 
     /**

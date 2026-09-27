@@ -107,6 +107,7 @@ export type EmpleadoDocumento = {
 export type Empleado = {
     id: number;
     empresa_id?: number;
+    user_id?: number | null;
     nombre: string;
     nombre_usuario: string;
     correo: string;
@@ -142,6 +143,203 @@ export type Empleado = {
     created_at?: string | null;
     updated_at?: string | null;
     deleted_at?: string | null;
+};
+
+export type Vacacion = {
+    id: number;
+    empleado: string;
+    solicitante: string;
+    fechaInicio: string;
+    fechaFin: string;
+    diasSolicitados: number;
+    saldoAlSolicitar: number;
+    ultimaVacacion: string | null;
+    estado: 'PENDIENTE' | 'AUTORIZADA' | 'VENCIDA' | 'RECHAZADA';
+    estadoLabel: string;
+    comentarios: string | null;
+    comentariosRechazo: string | null;
+    empleadosCobertura: string[];
+    resueltoPor: string | null;
+    resueltoAt: string | null;
+    puedeResolver: boolean;
+};
+
+export type DiaFestivo = {
+    id: number;
+    nombre: string;
+    fecha: string;
+};
+
+export type VacacionFilters = {
+    search: string;
+    estado: Vacacion['estado'] | null;
+};
+
+export type VacacionPermissionProps = {
+    canCreate: boolean;
+    canCreateForOthers: boolean;
+    canReview: boolean;
+    canManageHolidays: boolean;
+};
+
+export type PermisoLaboral = {
+    id: number;
+    empleado: string;
+    tipoPermiso: string | null;
+    solicitante: string;
+    fechaInicio: string;
+    fechaFin: string;
+    estado: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO' | 'VENCIDO';
+    estadoLabel: string;
+    comentarios: string | null;
+    comentariosRechazo: string | null;
+    empleadosCobertura: string[];
+    resueltoPor: string | null;
+    resueltoAt: string | null;
+    puedeResolver: boolean;
+};
+
+export type TipoPermiso = {
+    id: number;
+    nombre: string;
+    descripcion: string | null;
+    activo: boolean;
+    archivadoAt: string | null;
+};
+
+export type TipoPermisoOption = Pick<TipoPermiso, 'id' | 'nombre'>;
+
+export type TipoPermisoFilters = {
+    search: string;
+    activo: boolean | null;
+    archivados: boolean;
+};
+
+export type PermisoLaboralEmpleadoOption = {
+    id: number;
+    nombre: string;
+};
+
+export type PermisoLaboralFilters = {
+    search: string;
+    estado: PermisoLaboral['estado'] | null;
+};
+
+export type PermisoLaboralPermissionProps = {
+    canCreate: boolean;
+    canCreateForOthers: boolean;
+    canReview: boolean;
+};
+
+export type EstadoFaltaReglamento = 'PENDIENTE' | 'AUTORIZADA' | 'RECHAZADA';
+
+export type TipoFaltaReglamento = {
+    id: number;
+    nombre: string;
+    descripcion: string | null;
+    activo: boolean;
+    archivadoAt: string | null;
+};
+
+export type TipoFaltaReglamentoOption = Pick<
+    TipoFaltaReglamento,
+    'id' | 'nombre'
+>;
+
+export type FaltaReglamentoCatalogo = {
+    id: number;
+    tipoFaltaReglamentoId: number;
+    tipoFalta: string;
+    nombre: string;
+    descripcion: string | null;
+    activo: boolean;
+    archivadoAt: string | null;
+};
+
+export type FaltaReglamentoCatalogoOption = {
+    id: number;
+    tipoFaltaReglamentoId: number;
+    tipoFalta: string;
+    nombre: string;
+};
+
+export type FaltaReglamentoEvidence = {
+    id: number;
+    nombre: string;
+    mimeType: string;
+    fileExtension: string;
+};
+
+export type FaltaReglamento = {
+    id: number;
+    empleado: string;
+    falta: string;
+    tipoFalta: string;
+    fechaOcurrencia: string;
+    estado: EstadoFaltaReglamento;
+    estadoLabel: string;
+    solicitante: string;
+    comentarios: string | null;
+    comentariosRechazo: string | null;
+    resueltoPor: string | null;
+    resueltoAt: string | null;
+    conteoTipo: number;
+    puedeResolver: boolean;
+    evidencias: FaltaReglamentoEvidence[];
+};
+
+export type FaltaReglamentoEmpleadoOption = {
+    id: number;
+    nombre: string;
+};
+
+export type FaltaReglamentoFilters = {
+    search: string;
+    estado: EstadoFaltaReglamento | null;
+    empleadoId: number | null;
+    tipoFaltaReglamentoId: number | null;
+    fechaDesde: string | null;
+    fechaHasta: string | null;
+};
+
+export type FaltaReglamentoPermissionProps = {
+    canCreate: boolean;
+    canCreateForOthers: boolean;
+    canReview: boolean;
+};
+
+export type Incapacidad = {
+    id: number;
+    empleado: string;
+    solicitante: string;
+    fechaInicio: string;
+    fechaFin: string;
+    motivo: string;
+    estado: 'PENDIENTE' | 'AUTORIZADA' | 'VENCIDA' | 'RECHAZADA';
+    estadoLabel: string;
+    comentariosRechazo: string | null;
+    nombreArchivo: string | null;
+    mimeType: string | null;
+    extension: string | null;
+    resueltoPor: string | null;
+    resueltoAt: string | null;
+    puedeResolver: boolean;
+};
+
+export type IncapacidadFilters = {
+    search: string;
+    estado: Incapacidad['estado'] | null;
+};
+
+export type IncapacidadPermissionProps = {
+    canCreate: boolean;
+    canCreateForOthers: boolean;
+    canReview: boolean;
+};
+
+export type IncapacidadEmpleadoOption = {
+    id: number;
+    nombre: string;
 };
 
 export type DashboardStats = {

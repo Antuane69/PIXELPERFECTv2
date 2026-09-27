@@ -34,6 +34,7 @@ class EmpleadoFactory extends Factory
             'empresa_id' => fn (): mixed => Empresa::query()
                 ->where('slug', 'pixel-perfect')
                 ->value('id'),
+            'user_id' => null,
             'nombre' => fake()->name(),
             'nombre_usuario' => Str::lower(Str::limit(fake()->unique()->userName(), 60, '')),
             'correo' => fake()->unique()->safeEmail(),

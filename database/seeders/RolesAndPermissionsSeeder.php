@@ -40,6 +40,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'empleados_documentos_catalogo' => 'empleados',
             'puestos' => 'puestos',
             'tipos_documento' => 'empleados',
+            'tipos_permisos' => 'permisos_laborales',
+            'tipos_falta_reglamento' => 'faltas_reglamento',
+            'faltas_reglamento_catalogo' => 'faltas_reglamento',
         ] as $resource => $moduleKey) {
             foreach (['view', 'create', 'update', 'delete'] as $action) {
                 $permissionDefinitions[] = [
@@ -65,6 +68,39 @@ class RolesAndPermissionsSeeder extends Seeder
             'alcance' => AlcancePermiso::Empresa,
             'module_key' => 'usuarios',
         ];
+        foreach (['view', 'create', 'create_for_others', 'review'] as $action) {
+            $permissionDefinitions[] = [
+                'name' => "vacaciones.{$action}",
+                'alcance' => AlcancePermiso::Empresa,
+                'module_key' => 'vacaciones',
+            ];
+        }
+        $permissionDefinitions[] = [
+            'name' => 'vacaciones.manage_holidays',
+            'alcance' => AlcancePermiso::Empresa,
+            'module_key' => 'vacaciones',
+        ];
+        foreach (['view', 'create', 'create_for_others', 'review'] as $action) {
+            $permissionDefinitions[] = [
+                'name' => "permisos_laborales.{$action}",
+                'alcance' => AlcancePermiso::Empresa,
+                'module_key' => 'permisos_laborales',
+            ];
+        }
+        foreach (['view', 'create', 'create_for_others', 'review'] as $action) {
+            $permissionDefinitions[] = [
+                'name' => "incapacidades.{$action}",
+                'alcance' => AlcancePermiso::Empresa,
+                'module_key' => 'incapacidades',
+            ];
+        }
+        foreach (['view', 'create', 'create_for_others', 'review'] as $action) {
+            $permissionDefinitions[] = [
+                'name' => "faltas_reglamento.{$action}",
+                'alcance' => AlcancePermiso::Empresa,
+                'module_key' => 'faltas_reglamento',
+            ];
+        }
         $permissionDefinitions[] = [
             'name' => 'logs.view',
             'alcance' => AlcancePermiso::Plataforma,

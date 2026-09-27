@@ -2,9 +2,12 @@
 
 namespace App\Http\Requests\Empleados;
 
+use App\EstadoMembresiaEmpresa;
 use App\Models\Empleado;
+use App\Models\MembresiaEmpresa;
 use App\Models\Puesto;
 use App\Models\TipoDocumentoEmpleado;
+use App\Models\User;
 use Closure;
 use DateTimeImmutable;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -39,6 +42,7 @@ abstract class EmpleadoRequest extends FormRequest
         $today = now()->toDateString();
         $minimumBirthDate = now()->subYears(16)->toDateString();
         $currentPuestoId = $this->boundEmpleado()?->puesto_id;
+        $currentUserId = $this->boundEmpleado()?->user_id;
         $existingDocumentTypeIds = $this->boundEmpleado()?->documentos()
             ->pluck('tipo_documento_empleado_id')
             ->all() ?? [];
@@ -60,6 +64,24 @@ abstract class EmpleadoRequest extends FormRequest
                 'email:rfc',
                 'max:120',
                 $this->uniqueRule('correo'),
+            ],
+            'user_id' => [
+                'sometimes',
+                'nullable',
+                'integer',
+                Rule::exists(User::class, 'id')->where(static function ($query) use ($currentUserId): void {
+                    $query->where(function ($query) use ($currentUserId): void {
+                        $query->whereIn('id', MembresiaEmpresa::query()
+                            ->select('user_id')
+                            ->where('empresa_id', getPermissionsTeamId())
+                            ->where('estado', EstadoMembresiaEmpresa::Activa->value));
+
+                        if ($currentUserId !== null) {
+                            $query->orWhere('id', $currentUserId);
+                        }
+                    });
+                }),
+                $this->uniqueRule('user_id'),
             ],
             'curp' => [
                 $required,
@@ -161,7 +183,7 @@ abstract class EmpleadoRequest extends FormRequest
                 'min:0',
                 'max:9999999999.99',
             ],
-            'dias_vacaciones' => [$required, 'integer', 'min:2', 'max:3650'],
+            'dias_vacaciones' => [$required, 'integer', 'min:0', 'max:3650'],
             'dias_descanso' => ['sometimes', 'array', 'max:7'],
             'dias_descanso.*' => [
                 'required',
@@ -298,6 +320,10 @@ abstract class EmpleadoRequest extends FormRequest
             if (array_key_exists($field, $data)) {
                 $normalized[$field] = $this->nullableTrimmedString($data[$field], true);
             }
+        }
+
+        if (($data['user_id'] ?? null) === 'sin_vinculo' || ($data['user_id'] ?? null) === '') {
+            $normalized['user_id'] = null;
         }
 
         foreach ([

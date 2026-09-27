@@ -11,6 +11,7 @@ import {
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import { EmpleadoDetailDrawer } from '@/components/empleados/empleado-detail-drawer';
 import { EmpleadoFormFields } from '@/components/empleados/empleado-form-fields';
+import type { EmpleadoUsuarioOption } from '@/components/empleados/empleado-form-fields';
 import { FiltrosBase } from '@/components/filtros-base';
 import type { FilterFacet } from '@/components/filtros-base';
 import { ResourceExportDialog } from '@/components/resource-export-dialog';
@@ -37,6 +38,7 @@ type Props = {
     empleados: LaravelPaginator<Empleado>;
     puestos: Puesto[];
     tiposDocumento: TipoDocumentoEmpleado[];
+    usuarios: EmpleadoUsuarioOption[];
     filters?: {
         search?: string;
         puestoId?: number | null;
@@ -50,6 +52,7 @@ export default function EmpleadosIndex({
     empleados,
     puestos,
     tiposDocumento,
+    usuarios,
     filters,
 }: Props) {
     const { can } = usePermissions();
@@ -304,6 +307,7 @@ export default function EmpleadosIndex({
                             empleado={null}
                             puestos={puestos}
                             tiposDocumento={tiposDocumento}
+                            usuarios={usuarios}
                             errors={errors}
                         />
                     )}
@@ -326,6 +330,7 @@ export default function EmpleadosIndex({
                             empleado={editing}
                             puestos={puestos}
                             tiposDocumento={tiposDocumento}
+                            usuarios={usuarios}
                             errors={errors}
                         />
                     )}

@@ -4,15 +4,20 @@ namespace Tests\Feature\Reportes;
 
 use App\Models\Empresa;
 use App\Models\MembresiaEmpresa;
+use App\Models\PermisosLaborales\TipoPermiso;
 use App\Models\Puesto;
 use App\Models\User;
 use App\Services\ImageCompressor;
 use App\Services\Reportes\ExportConfig;
 use App\Services\Reportes\ExportService;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use LogicException;
 use Mockery\MockInterface;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -85,7 +90,7 @@ class ExportarReporteTest extends TestCase
     {
         $this->mock(ExportService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('excelFromQuery')
-                ->times(5)
+                ->times(6)
                 ->andReturnUsing(function (): BinaryFileResponse {
                     $path = tempnam(sys_get_temp_dir(), 'reporte-prueba-');
                     file_put_contents($path, 'xlsx');
@@ -99,6 +104,7 @@ class ExportarReporteTest extends TestCase
             'puestos',
             'roles',
             'tipos-documento-empleados',
+            'tipos-permisos',
             'usuarios',
         ] as $reporte) {
             $this->actingAs($this->administrator)
@@ -106,6 +112,56 @@ class ExportarReporteTest extends TestCase
                 ->assertOk()
                 ->assertDownload('reporte.xlsx');
         }
+    }
+
+    public function test_permission_type_export_applies_search_status_and_company_scope(): void
+    {
+        TipoPermiso::factory()->for($this->empresa)->create([
+            'nombre' => 'Permiso exportable activo',
+            'activo' => true,
+        ]);
+        TipoPermiso::factory()->for($this->empresa)->inactive()->create([
+            'nombre' => 'Permiso exportable inactivo',
+        ]);
+        TipoPermiso::factory()->for(Empresa::factory()->create())->create([
+            'nombre' => 'Permiso exportable de otra empresa',
+            'activo' => true,
+        ]);
+
+        $this->mock(ExportService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('excelFromQuery')
+                ->once()
+                ->andReturnUsing(function (
+                    ExportConfig $config,
+                    EloquentBuilder|QueryBuilder|Collection $query,
+                ): BinaryFileResponse {
+                    if (! $query instanceof EloquentBuilder) {
+                        throw new LogicException('El reporte de tipos de permisos debe usar una consulta Eloquent.');
+                    }
+
+                    $this->assertSame(
+                        ['Permiso exportable activo'],
+                        $query->pluck('nombre')->all(),
+                    );
+
+                    $path = tempnam(sys_get_temp_dir(), 'reporte-prueba-');
+                    file_put_contents($path, 'xlsx');
+
+                    return response()->download($path, 'reporte.xlsx')->deleteFileAfterSend(true);
+                });
+        });
+
+        $this->actingAs($this->administrator)
+            ->post(route('empresas.reportes.tipos-permisos.exportar'), [
+                'formato' => 'xlsx',
+                'filtros' => [
+                    'search' => 'Permiso exportable',
+                    'activo' => true,
+                    'archivados' => false,
+                ],
+            ])
+            ->assertOk()
+            ->assertDownload('reporte.xlsx');
     }
 
     public function test_platform_administrator_can_request_company_document_type_report(): void

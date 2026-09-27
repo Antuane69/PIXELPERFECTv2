@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Actions\Empleados\DeleteEmpleado;
 use App\Actions\Empleados\RestoreEmpleado;
 use App\Actions\Empleados\SaveEmpleado;
+use App\EstadoMembresiaEmpresa;
 use App\Http\Requests\Empleados\StoreEmpleadoRequest;
 use App\Http\Requests\Empleados\UpdateEmpleadoRequest;
 use App\Models\Empleado;
 use App\Models\EmpleadoDocumento;
 use App\Models\Puesto;
 use App\Models\TipoDocumentoEmpleado;
+use App\Models\User;
 use App\Services\Empresas\EmpresaContext;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,6 +47,37 @@ class EmpleadoController extends Controller
     {
         $empresa = $this->empresaContext->empresaRequerida();
         Gate::authorize('viewAny', Empleado::class);
+        $usuarioActual = $request->user();
+        $puedeAdministrarExpedientes = $usuarioActual instanceof User
+            && ($usuarioActual->can('empleados.create') || $usuarioActual->can('empleados.update'));
+
+        $usuariosActivos = $empresa->membresias()
+            ->where('estado', EstadoMembresiaEmpresa::Activa->value)
+            ->pluck('user_id')
+            ->map(static fn (int|string $userId): int => (int) $userId)
+            ->all();
+        $empleadosVinculados = Empleado::withTrashed()
+            ->where('empresa_id', $empresa->id)
+            ->whereNotNull('user_id')
+            ->pluck('id', 'user_id');
+        $userIds = array_values(array_unique([
+            ...$usuariosActivos,
+            ...$empleadosVinculados->keys()->map(static fn (int|string $userId): int => (int) $userId)->all(),
+        ]));
+        $usuarios = User::query()
+            ->whereIn('id', $userIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email'])
+            ->map(static fn (User $user): array => [
+                'id' => $user->id,
+                'nombre' => $user->name,
+                'correo' => $user->email,
+                'activo' => in_array($user->id, $usuariosActivos, true),
+                'empleadoId' => $empleadosVinculados->get($user->id) !== null
+                    ? (int) $empleadosVinculados->get($user->id)
+                    : null,
+            ])
+            ->values();
 
         $search = $request->string('search')->squish()->toString();
         $perPage = $this->perPage($request);
@@ -54,6 +87,7 @@ class EmpleadoController extends Controller
             ->select([
                 'id',
                 'empresa_id',
+                'user_id',
                 'nombre',
                 'nombre_usuario',
                 'correo',
@@ -143,6 +177,7 @@ class EmpleadoController extends Controller
                 ->where('empresa_id', getPermissionsTeamId())
                 ->orderBy('nombre')
                 ->get(),
+            'usuarios' => $puedeAdministrarExpedientes ? $usuarios : [],
             'tiposDocumento' => TipoDocumentoEmpleado::query()
                 ->select([
                     'id',
@@ -249,6 +284,7 @@ class EmpleadoController extends Controller
     {
         return [
             'id' => $empleado->id,
+            'user_id' => $empleado->user_id,
             'nombre' => $empleado->nombre,
             'nombre_usuario' => $empleado->nombre_usuario,
             'correo' => $empleado->correo,

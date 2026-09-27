@@ -48,6 +48,11 @@ class ExportController extends Controller
         return $this->generar($request, 'tipos-documento-empleados');
     }
 
+    public function exportarTiposPermiso(ExportarReporteRequest $request): Response
+    {
+        return $this->generar($request, 'tipos-permisos');
+    }
+
     private function generar(ExportarReporteRequest $request, string $reporte): Response
     {
         $formato = $request->string('formato')->toString();

@@ -29,6 +29,7 @@ type ResourceFormDialogProps = {
     className?: string;
     resetOnSuccess?: boolean;
     noValidate?: boolean;
+    submitDisabled?: boolean;
 };
 
 export function ResourceFormDialog({
@@ -44,6 +45,7 @@ export function ResourceFormDialog({
     className,
     resetOnSuccess = false,
     noValidate = false,
+    submitDisabled = false,
 }: ResourceFormDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -86,7 +88,10 @@ export function ResourceFormDialog({
                                 >
                                     Cancelar
                                 </Button>
-                                <Button type="submit" disabled={processing}>
+                                <Button
+                                    type="submit"
+                                    disabled={processing || submitDisabled}
+                                >
                                     {processing && <Spinner />}
                                     {submitLabel}
                                 </Button>
